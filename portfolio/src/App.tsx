@@ -128,14 +128,20 @@ export function Projects() {
                   ))}
                 </ul>
                 <div className="mt-6 flex gap-3">
-                  <a
-                    href={project.liveUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-lg bg-brand-accent px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-600"
-                  >
-                    Live demo →
-                  </a>
+                  {project.liveUrl ? (
+                    <a
+                      href={project.liveUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-lg bg-brand-accent px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-600"
+                    >
+                      Live demo →
+                    </a>
+                  ) : (
+                    <span className="rounded-lg bg-white/10 px-4 py-2 text-sm text-gray-500">
+                      Demo link pending
+                    </span>
+                  )}
                   <a
                     href={`${GITHUB_URL}/tree/main/${project.githubPath}`}
                     target="_blank"
