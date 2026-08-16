@@ -77,11 +77,15 @@ VITE_TMDB_API_KEY=your_tmdb_key
 **Environment variables:**
 
 ```
-VITE_GEMINI_API_KEY=your_gemini_key
-VITE_GEMINI_MODEL=gemini-3.5-flash
+ADZUNA_APP_ID=your_adzuna_app_id
+ADZUNA_APP_KEY=your_adzuna_app_key
+GEMINI_API_KEY=your_gemini_key
+GEMINI_MODEL=gemini-3.5-flash
 VITE_SUPABASE_URL=https://xxx.supabase.co
 VITE_SUPABASE_ANON_KEY=your_anon_key
 ```
+
+Re-run `job-tracker/supabase/schema.sql` after pulling ApplyTrack v2 (adds inbox, saved searches, master CV, tailored docs).
 
 ---
 

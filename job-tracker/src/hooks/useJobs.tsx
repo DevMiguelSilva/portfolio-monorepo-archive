@@ -29,10 +29,29 @@ interface JobsContextValue {
 
 const JobsContext = createContext<JobsContextValue | null>(null)
 
+function normalizeJob(job: JobApplication): JobApplication {
+  const status = job.status ?? 'saved'
+  return {
+    ...createEmptyJob(),
+    ...job,
+    status,
+    // Saved jobs are not applications — drop stale applied dates from undo moves
+    appliedDate: status === 'saved' ? '' : (job.appliedDate ?? ''),
+    source: job.source ?? 'manual',
+    externalId: job.externalId ?? '',
+    matchScore: job.matchScore ?? null,
+    cvTrack: job.cvTrack ?? null,
+    jdSummary: job.jdSummary ?? '',
+    extractedSkills: job.extractedSkills ?? [],
+    extractedRequirements: job.extractedRequirements ?? [],
+  }
+}
+
 function readLocalJobs(): JobApplication[] {
   try {
     const stored = localStorage.getItem(LOCAL_STORAGE_KEY)
-    return stored ? (JSON.parse(stored) as JobApplication[]) : []
+    if (!stored) return []
+    return (JSON.parse(stored) as JobApplication[]).map(normalizeJob)
   } catch {
     return []
   }
@@ -78,7 +97,7 @@ export function JobsProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      setJobs(cloudJobs)
+      setJobs(cloudJobs.map(normalizeJob))
     } catch (err) {
       console.error('Failed to load jobs:', err)
       setJobs(readLocalJobs())
@@ -98,13 +117,14 @@ export function JobsProvider({ children }: { children: ReactNode }) {
 
   const addJob = useCallback(
     async (job: JobApplication) => {
+      const normalized = normalizeJob(job)
       if (isCloudSync && supabase && user) {
-        const row = { ...jobToRow(job, user.id), updated_at: new Date().toISOString() }
+        const row = { ...jobToRow(normalized, user.id), updated_at: new Date().toISOString() }
         const { error } = await supabase.from('job_applications').insert(row)
         if (error) throw error
-        setJobs((prev) => [job, ...prev])
+        setJobs((prev) => [normalized, ...prev])
       } else {
-        persistLocal([job, ...jobs])
+        persistLocal([normalized, ...jobs])
       }
     },
     [isCloudSync, user, jobs, persistLocal]
@@ -114,7 +134,7 @@ export function JobsProvider({ children }: { children: ReactNode }) {
     async (id: string, updates: Partial<JobApplication>) => {
       const updatedAt = new Date().toISOString()
       const nextJobs = jobs.map((job) =>
-        job.id === id ? { ...job, ...updates, updatedAt } : job
+        job.id === id ? normalizeJob({ ...job, ...updates, updatedAt }) : job
       )
       const updated = nextJobs.find((j) => j.id === id)
       if (!updated) return
@@ -149,12 +169,12 @@ export function JobsProvider({ children }: { children: ReactNode }) {
     async (id: string, status: JobStatus) => {
       const job = jobs.find((j) => j.id === id)
       if (!job) return
+      // Saved = not an application for streak. Applied/interview/offer/rejected keep or set date.
+      const countsAsApply = status !== 'saved'
+      const today = new Date().toISOString().slice(0, 10)
       await updateJob(id, {
         status,
-        appliedDate:
-          status === 'applied' && !job.appliedDate
-            ? new Date().toISOString().slice(0, 10)
-            : job.appliedDate,
+        appliedDate: countsAsApply ? job.appliedDate || today : '',
       })
     },
     [jobs, updateJob]

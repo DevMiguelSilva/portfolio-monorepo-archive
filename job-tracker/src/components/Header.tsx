@@ -1,6 +1,8 @@
 import { Link, NavLink } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import { useInbox } from '../hooks/useInbox'
 import { useJobs } from '../hooks/useJobs'
+import { usePortalFeeds } from '../hooks/usePortalFeeds'
 import { useTheme } from '../hooks/useTheme'
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -14,6 +16,8 @@ export function Header() {
   const { theme, toggleTheme } = useTheme()
   const { signOut, isCloudEnabled, user } = useAuth()
   const { isCloudSync } = useJobs()
+  const { newCount } = useInbox()
+  const { todayComplete, activeFeeds, checkedTodayCount } = usePortalFeeds()
 
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-track-800 dark:bg-track-950/90">
@@ -23,20 +27,37 @@ export function Header() {
           <div>
             <span className="font-bold text-track-accent">ApplyTrack</span>
             <span className="ml-2 hidden text-xs text-slate-500 dark:text-slate-400 sm:inline">
-              AI Job Tracker
+              Find · Tailor · Track
             </span>
           </div>
         </Link>
 
-        <nav className="flex items-center gap-1 sm:gap-2">
+        <nav className="flex flex-wrap items-center gap-1 sm:gap-2">
           <NavLink to="/" className={navLinkClass} end>
             Board
           </NavLink>
-          <NavLink to="/add" className={navLinkClass}>
-            Add Job
+          <NavLink to="/portals" className={navLinkClass}>
+            Portals
+            {activeFeeds.length > 0 && !todayComplete && (
+              <span className="ml-1 rounded-full bg-amber-500/90 px-1.5 text-xs text-white">
+                {checkedTodayCount}/{activeFeeds.length}
+              </span>
+            )}
+            {activeFeeds.length > 0 && todayComplete && (
+              <span className="ml-1 text-xs text-emerald-300">✓</span>
+            )}
           </NavLink>
-          <NavLink to="/profile" className={navLinkClass}>
-            Profile
+          <NavLink to="/inbox" className={navLinkClass}>
+            Inbox
+            {newCount > 0 && (
+              <span className="ml-1 rounded-full bg-white/20 px-1.5 text-xs">{newCount}</span>
+            )}
+          </NavLink>
+          <NavLink to="/add" className={navLinkClass}>
+            Add
+          </NavLink>
+          <NavLink to="/cv" className={navLinkClass}>
+            CVs
           </NavLink>
           {isCloudSync && (
             <span className="hidden text-xs text-emerald-500 sm:inline" title="Synced to cloud">

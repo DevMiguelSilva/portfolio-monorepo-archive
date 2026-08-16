@@ -1,4 +1,8 @@
+import type { CvTrack } from './cv'
+
 export type JobStatus = 'saved' | 'applied' | 'interview' | 'offer' | 'rejected'
+export type InboxStatus = 'new' | 'approved' | 'dismissed'
+export type SearchTrack = CvTrack | 'auto'
 
 export interface JobApplication {
   id: string
@@ -10,9 +14,16 @@ export interface JobApplication {
   status: JobStatus
   appliedDate: string
   notes: string
+  /** Full original job posting text — never replace with an AI summary. */
   jobDescription: string
+  /** Short AI brief of the posting (separate from personal/interview notes). */
+  jdSummary: string
   extractedSkills: string[]
   extractedRequirements: string[]
+  source: string
+  externalId: string
+  matchScore: number | null
+  cvTrack: CvTrack | null
   createdAt: string
   updatedAt: string
 }
@@ -28,9 +39,46 @@ export interface ParsedJobPosting {
   company: string
   role: string
   location: string
+  salary: string
   skills: string[]
   requirements: string[]
   summary: string
+}
+
+export interface SavedSearch {
+  id: string
+  /** Friendly name shown in the UI (e.g. "React Toronto"). */
+  label: string
+  query: string
+  location: string
+  country: string
+  maxDaysOld: number
+  excludeTerms: string
+  /** Which master CV to score against (auto = best of both). */
+  track: SearchTrack
+  active: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface InboxJob {
+  id: string
+  externalId: string
+  source: string
+  company: string
+  role: string
+  location: string
+  jobUrl: string
+  salary: string
+  description: string
+  matchScore: number
+  matchReasons: string[]
+  matchedTrack: CvTrack | null
+  status: InboxStatus
+  savedSearchId: string | null
+  fetchedAt: string
+  createdAt: string
+  updatedAt: string
 }
 
 export const STATUS_CONFIG: Record<
@@ -71,6 +119,9 @@ export const STATUS_CONFIG: Record<
 
 export const STATUS_ORDER: JobStatus[] = ['saved', 'applied', 'interview', 'offer', 'rejected']
 
+/** Board columns shown by default (Rejected is opt-in via the stats control). */
+export const BOARD_STATUS_ORDER: JobStatus[] = ['saved', 'applied', 'interview', 'offer']
+
 export function createEmptyJob(overrides: Partial<JobApplication> = {}): JobApplication {
   const now = new Date().toISOString()
   return {
@@ -84,13 +135,89 @@ export function createEmptyJob(overrides: Partial<JobApplication> = {}): JobAppl
     appliedDate: '',
     notes: '',
     jobDescription: '',
+    jdSummary: '',
     extractedSkills: [],
     extractedRequirements: [],
+    source: 'manual',
+    externalId: '',
+    matchScore: null,
+    cvTrack: null,
     createdAt: now,
     updatedAt: now,
     ...overrides,
   }
 }
+
+export function createEmptySavedSearch(overrides: Partial<SavedSearch> = {}): SavedSearch {
+  const now = new Date().toISOString()
+  return {
+    id: crypto.randomUUID(),
+    label: '',
+    query: '',
+    location: '',
+    country: 'ca',
+    maxDaysOld: 7,
+    excludeTerms: '',
+    track: 'auto',
+    active: true,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  }
+}
+
+export const DEFAULT_SAVED_SEARCHES: Omit<SavedSearch, 'id' | 'createdAt' | 'updatedAt'>[] = [
+  {
+    label: 'React Toronto',
+    query: 'React TypeScript',
+    location: 'Toronto',
+    country: 'ca',
+    maxDaysOld: 7,
+    excludeTerms: '',
+    track: 'frontend',
+    active: true,
+  },
+  {
+    label: 'FE Vancouver',
+    query: 'Front End Engineer',
+    location: 'Vancouver',
+    country: 'ca',
+    maxDaysOld: 7,
+    excludeTerms: '',
+    track: 'frontend',
+    active: true,
+  },
+  {
+    label: 'React Remote CA',
+    query: 'Frontend React TypeScript',
+    location: 'Remote',
+    country: 'ca',
+    maxDaysOld: 7,
+    excludeTerms: '',
+    track: 'frontend',
+    active: true,
+  },
+  {
+    label: 'Power Platform Toronto',
+    query: 'Power Platform Power Apps',
+    location: 'Toronto',
+    country: 'ca',
+    maxDaysOld: 7,
+    excludeTerms: '',
+    track: 'powerPlatform',
+    active: true,
+  },
+  {
+    label: 'Power Automate Remote',
+    query: 'Power Automate Dataverse',
+    location: 'Remote',
+    country: 'ca',
+    maxDaysOld: 7,
+    excludeTerms: '',
+    track: 'powerPlatform',
+    active: true,
+  },
+]
 
 export const EMPTY_PROFILE: UserProfile = {
   name: '',
@@ -110,4 +237,11 @@ export const DEFAULT_PROFILE: UserProfile = {
 
 export function isProfileEmpty(profile: UserProfile): boolean {
   return !profile.name.trim() && !profile.experienceSummary.trim()
+}
+
+export function profileSkillsList(profile: UserProfile): string[] {
+  return profile.skills
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
 }

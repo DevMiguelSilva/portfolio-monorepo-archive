@@ -1,20 +1,17 @@
-# ApplyTrack — AI Job Application Tracker
+# ApplyTrack v2 — Find · Tailor · Track
 
-Track your job search, manage applications on a Kanban board, and use AI to parse postings, draft cover letters, and generate tailored resume bullets. Built as portfolio project #2 for a software developer career in Canada.
-
-![React](https://img.shields.io/badge/React-18-blue)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
-![AI](https://img.shields.io/badge/AI-Gemini-8E75B2)
+Human-in-the-loop job search for Canada front-end roles: refresh an Adzuna-powered inbox, approve fits into a Kanban tracker, tailor a DOCX from your master CV, and keep JD + notes ready for interview calls.
 
 ## Features
 
-- **Kanban board** — drag jobs across Saved → Applied → Interview → Offer → Rejected
-- **AI job parser** — paste a posting, AI extracts company, role, skills & requirements
-- **AI cover letter** — tailored draft based on your profile + the job
-- **AI resume bullets** — action-verb bullets matched to the posting
-- **Profile page** — your skills & experience (AI stays honest, no invented history)
-- **Stats dashboard** — count applications by stage
-- **Dark / light theme**
+- **Job Inbox** — saved searches → Adzuna CA refresh → match % → approve / dismiss
+- **Kanban board** — Saved → Applied → Interview → Offer → Rejected
+- **Master CV** — structured template (skills, experience, projects, education)
+- **ATS tailor** — gap report + AI rewrite from master CV (no invented experience)
+- **DOCX / Print PDF** — download `Company_Role.docx` per application
+- **Interview prep** — JD, skills, tailored snapshot, notes on every job
+- **Paste fallback** — Indeed / ZipRecruiter postings via Add Job + AI parse
+- **Server-side AI & Adzuna** — keys stay off the browser (`/api/*`)
 
 ## Tech stack
 
@@ -23,17 +20,17 @@ Track your job search, manage applications on a Kanban board, and use AI to pars
 | React 18 + Vite | Frontend |
 | TypeScript | Type safety |
 | Tailwind CSS | Styling |
-| React Router | Routing |
-| Google Gemini API | AI features (free tier) |
-| localStorage | Job & profile persistence |
+| Vercel Serverless | `/api/adzuna`, `/api/gemini` |
+| Adzuna API | Canada job discovery |
+| Google Gemini | Parse, tailor, cover letters |
+| Supabase (optional) | Auth + sync; localStorage without it |
 
 ## Getting started
 
-### 1. Get a free Gemini API key
+### 1. API keys
 
-1. Go to [Google AI Studio](https://aistudio.google.com/apikey)
-2. Sign in with Google
-3. Click **Create API key** — it's free
+1. [Adzuna developer](https://developer.adzuna.com/) → App ID + App Key
+2. [Google AI Studio](https://aistudio.google.com/apikey) → Gemini key
 
 ### 2. Configure environment
 
@@ -41,11 +38,18 @@ Track your job search, manage applications on a Kanban board, and use AI to pars
 cp .env.example .env
 ```
 
-Add your key to `.env`:
+```
+ADZUNA_APP_ID=...
+ADZUNA_APP_KEY=...
+GEMINI_API_KEY=...
+GEMINI_MODEL=gemini-3.5-flash
 
+# Optional cloud sync
+VITE_SUPABASE_URL=...
+VITE_SUPABASE_ANON_KEY=...
 ```
-VITE_GEMINI_API_KEY=your_actual_key_here
-```
+
+If using Supabase, run [`supabase/schema.sql`](supabase/schema.sql) in the SQL editor.
 
 ### 3. Install & run
 
@@ -54,42 +58,31 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173)
+Open [http://localhost:5173](http://localhost:5173). Local `/api/*` is handled by the Vite plugin (reads `.env`).
 
-> **Note:** If movie-discovery is also running, this app may use port 5174.
+## Daily workflow
 
-## How to use
-
-1. **Profile** — fill in your name, skills, and experience (used by AI)
-2. **Add Job** — paste a job posting → click "Parse with AI" → save
-3. **Board** — drag cards between columns as your application progresses
-4. **Job detail** — use AI to generate a cover letter or resume bullets
-
-## What this demonstrates (AI + software development)
-
-- Integrating an LLM API with proper env vars and error handling
-- Prompt engineering for structured JSON output (job parsing)
-- AI as a **feature**, not a gimmick — clear inputs, outputs, and guardrails
-- Honest AI usage — prompts instruct the model not to invent experience
-- Full React app patterns: context, routing, forms, drag-and-drop
+1. **Inbox** → Refresh → approve roles that fit (or dismiss)
+2. **Job detail** → Gap check / Tailor from master CV → Download DOCX
+3. Apply on Indeed / ZipRecruiter with that file
+4. Move card to **Applied** / **Interview** — open Interview prep when someone calls
 
 ## Deploy (Vercel)
 
-1. Push to GitHub
-2. Import on [vercel.com](https://vercel.com)
-3. Set **Root Directory** to `job-tracker`
-4. Add env var: `VITE_GEMINI_API_KEY`
-5. Deploy
+1. Root Directory: `job-tracker`
+2. Env vars: `ADZUNA_APP_ID`, `ADZUNA_APP_KEY`, `GEMINI_API_KEY`, `GEMINI_MODEL`, plus Supabase if used
+3. Deploy (API routes under `api/` + Vite `dist`)
 
 ## Project structure
 
 ```
+api/                 # Vercel serverless + shared handlers
 src/
-├── api/gemini.ts       # AI API calls & prompts
-├── hooks/              # Jobs, profile, theme
-├── components/         # Kanban, AI panel, cards
-├── pages/              # Board, Add, Detail, Profile
-└── types/job.ts        # TypeScript interfaces
+  api/               # Browser clients for /api/*
+  hooks/             # Jobs, inbox, master CV, tailored docs
+  lib/               # matchScore, docxExport, database mappers
+  pages/             # Board, Inbox, Master CV, Detail, …
+supabase/schema.sql  # v2 tables + RLS
 ```
 
 ## License

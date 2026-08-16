@@ -2,13 +2,19 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { LoadingSpinner } from './components/LoadingSpinner'
 import { AuthProvider, useAuth } from './hooks/useAuth'
+import { InboxProvider } from './hooks/useInbox'
 import { JobsProvider } from './hooks/useJobs'
-import { ProfileProvider } from './hooks/useProfile'
+import { MasterCvProvider } from './hooks/useMasterCv'
+import { PortalFeedsProvider } from './hooks/usePortalFeeds'
+import { SavedSearchesProvider } from './hooks/useSavedSearches'
+import { TailoredDocsProvider } from './hooks/useTailoredDocs'
 import { AddJobPage } from './pages/AddJobPage'
 import { AuthPage } from './pages/AuthPage'
 import { DashboardPage } from './pages/DashboardPage'
+import { InboxPage } from './pages/InboxPage'
 import { JobDetailPage } from './pages/JobDetailPage'
-import { ProfilePage } from './pages/ProfilePage'
+import { MasterCvPage } from './pages/MasterCvPage'
+import { PortalsPage } from './pages/PortalsPage'
 
 function AppRoutes() {
   const { user, loading, isCloudEnabled } = useAuth()
@@ -23,18 +29,28 @@ function AppRoutes() {
 
   return (
     <JobsProvider>
-      <ProfileProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route element={<Layout />}>
-              <Route index element={<DashboardPage />} />
-              <Route path="add" element={<AddJobPage />} />
-              <Route path="job/:id" element={<JobDetailPage />} />
-              <Route path="profile" element={<ProfilePage />} />
-            </Route>
-          </Routes>
-        </BrowserRouter>
-      </ProfileProvider>
+      <MasterCvProvider>
+        <SavedSearchesProvider>
+          <TailoredDocsProvider>
+            <PortalFeedsProvider>
+              <InboxProvider>
+                <BrowserRouter>
+                  <Routes>
+                    <Route element={<Layout />}>
+                      <Route index element={<DashboardPage />} />
+                      <Route path="inbox" element={<InboxPage />} />
+                      <Route path="portals" element={<PortalsPage />} />
+                      <Route path="add" element={<AddJobPage />} />
+                      <Route path="job/:id" element={<JobDetailPage />} />
+                      <Route path="cv" element={<MasterCvPage />} />
+                    </Route>
+                  </Routes>
+                </BrowserRouter>
+              </InboxProvider>
+            </PortalFeedsProvider>
+          </TailoredDocsProvider>
+        </SavedSearchesProvider>
+      </MasterCvProvider>
     </JobsProvider>
   )
 }

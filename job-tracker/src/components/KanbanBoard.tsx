@@ -1,50 +1,98 @@
 import { useState } from 'react'
 import type { JobApplication, JobStatus } from '../types/job'
-import { STATUS_CONFIG, STATUS_ORDER } from '../types/job'
-import { JobCard } from './JobCard'
+import { BOARD_STATUS_ORDER, STATUS_CONFIG, STATUS_ORDER } from '../types/job'
+import { attachCardDragGhost, JobCard } from './JobCard'
 
 interface KanbanBoardProps {
   jobs: JobApplication[]
   onMoveJob: (id: string, status: JobStatus) => void
+  /** When false, Rejected column is hidden (jobs still tracked). */
+  showRejected?: boolean
+  onHideRejected?: () => void
 }
 
-export function KanbanBoard({ jobs, onMoveJob }: KanbanBoardProps) {
+export function KanbanBoard({
+  jobs,
+  onMoveJob,
+  showRejected = false,
+  onHideRejected,
+}: KanbanBoardProps) {
   const [draggedId, setDraggedId] = useState<string | null>(null)
+  const [dropTarget, setDropTarget] = useState<JobStatus | null>(null)
+  const columns = showRejected ? STATUS_ORDER : BOARD_STATUS_ORDER
 
   const handleDrop = (status: JobStatus) => {
     if (draggedId) {
       onMoveJob(draggedId, status)
-      setDraggedId(null)
     }
+    setDraggedId(null)
+    setDropTarget(null)
   }
 
   return (
     <div className="flex gap-4 overflow-x-auto pb-4">
-      {STATUS_ORDER.map((status) => {
+      {columns.map((status) => {
         const config = STATUS_CONFIG[status]
         const columnJobs = jobs.filter((job) => job.status === status)
+        const isTarget = dropTarget === status && draggedId != null
 
         return (
           <div
             key={status}
             className="min-w-[260px] flex-1"
-            onDragOver={(e) => e.preventDefault()}
+            onDragOver={(e) => {
+              e.preventDefault()
+              e.dataTransfer.dropEffect = 'move'
+              setDropTarget(status)
+            }}
+            onDragLeave={() => {
+              setDropTarget((current) => (current === status ? null : current))
+            }}
             onDrop={() => handleDrop(status)}
           >
-            <div className={`mb-3 flex items-center justify-between rounded-lg border px-3 py-2 ${config.bg} ${config.border}`}>
+            <div
+              className={`mb-3 flex items-center justify-between rounded-lg border px-3 py-2 ${config.bg} ${config.border}`}
+            >
               <h2 className={`text-sm font-semibold ${config.color}`}>{config.label}</h2>
-              <span className="rounded-full bg-white/60 px-2 py-0.5 text-xs font-bold dark:bg-black/20">
-                {columnJobs.length}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-white/60 px-2 py-0.5 text-xs font-bold dark:bg-black/20">
+                  {columnJobs.length}
+                </span>
+                {status === 'rejected' && onHideRejected && (
+                  <button
+                    type="button"
+                    onClick={onHideRejected}
+                    className="text-xs font-medium text-red-600/80 hover:underline dark:text-red-400"
+                  >
+                    Hide
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="space-y-2 min-h-[120px]">
+            <div
+              className={`min-h-[120px] space-y-2 rounded-lg transition ${
+                isTarget ? 'bg-track-accent/5 ring-2 ring-inset ring-track-accent/30' : ''
+              }`}
+            >
               {columnJobs.length === 0 ? (
                 <p className="rounded-lg border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400 dark:border-track-700">
                   Drop jobs here
                 </p>
               ) : (
                 columnJobs.map((job) => (
-                  <JobCard key={job.id} job={job} onDragStart={setDraggedId} />
+                  <JobCard
+                    key={job.id}
+                    job={job}
+                    isDragging={draggedId === job.id}
+                    onDragStart={(id, event) => {
+                      setDraggedId(id)
+                      attachCardDragGhost(event)
+                    }}
+                    onDragEnd={() => {
+                      setDraggedId(null)
+                      setDropTarget(null)
+                    }}
+                  />
                 ))
               )}
             </div>
