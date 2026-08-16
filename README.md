@@ -1,28 +1,41 @@
 # Portafolio
 
-Personal portfolio workspace for Miguel Silva — software developer career in Canada.
+Personal portfolio workspace for **Miguel Silva** — software developer career in Canada.
 
 ## Projects
 
-| Project | Stack | Status | Description |
-|---------|-------|--------|-------------|
-| [movie-discovery](./movie-discovery) | React, TypeScript, Tailwind, TMDB | In progress | Movie search with scores, trailers, and reviews |
-
-## Roadmap
-
-1. **Movie Discovery** — first deployed app (current)
-2. **More apps** — habit tracker, job application tracker, etc.
-3. **Portfolio site** — showcase all projects with live links
+| Project | Folder | Stack | Description |
+|---------|--------|-------|-------------|
+| **Portfolio Site** | [portfolio](./portfolio) | React, TypeScript, Tailwind | Main landing page showcasing all work |
+| **Cine — Movie Discovery** | [movie-discovery](./movie-discovery) | React, TMDB API | Search movies, scores, trailers, reviews |
+| **ApplyTrack — AI Job Tracker** | [job-tracker](./job-tracker) | React, Gemini AI, Supabase | Kanban job board with AI tools + cloud sync |
 
 ## Structure
 
 ```
 Portafolio/
-├── movie-discovery/   ← React movie app
-└── README.md          ← this file
+├── portfolio/         ← Main portfolio website
+├── movie-discovery/   ← Movie app
+├── job-tracker/       ← AI job tracker with Supabase
+├── DEPLOY.md          ← Step-by-step deploy guide
+└── README.md
 ```
 
-Each project lives in its own folder with its own `README`, dependencies, and deploy config.
+## Quick start (local)
+
+Each app runs independently:
+
+```bash
+cd portfolio && npm install && npm run dev
+cd movie-discovery && npm install && npm run dev
+cd job-tracker && npm install && npm run dev
+```
+
+Copy `.env.example` → `.env` in each app that needs API keys.
+
+## Deploy to the web
+
+See **[DEPLOY.md](./DEPLOY.md)** for full instructions (Vercel + Supabase).
 
 ## Author
 
