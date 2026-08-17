@@ -1,6 +1,6 @@
 /**
- * Live demo URLs — paste your real Vercel URLs below, then push to GitHub.
- * Env vars in Vercel (VITE_JOB_TRACKER_URL) override these.
+ * Live demo URLs — env vars in Vercel override these fallbacks.
+ * jobTracker: legacy Vercel hostname (rename project in Vercel dashboard if desired).
  */
 export const LIVE_URLS = {
   jobTracker: 'https://portafolio-mu-two-49.vercel.app',
