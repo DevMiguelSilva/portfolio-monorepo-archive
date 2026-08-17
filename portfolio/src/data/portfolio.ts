@@ -29,7 +29,7 @@ export const projects: Project[] = [
       'Cloud sync & authenticated sessions',
     ],
     liveUrl: getJobTrackerUrl(),
-    githubUrl: 'https://github.com/DevMiguelSilva/Portafolio/tree/main/job-tracker',
+    githubUrl: 'https://github.com/DevMiguelSilva/Portfolio/tree/main/job-tracker',
     featured: true,
     accent: 'teal',
   },

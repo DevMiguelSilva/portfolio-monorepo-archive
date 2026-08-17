@@ -1,6 +1,6 @@
-# Portafolio
+# Portfolio
 
-Personal portfolio workspace for **Miguel Silva** — software developer career in Canada.
+Personal workspace for **Miguel Silva** — portfolio site plus independent product apps.
 
 ## Projects
 
@@ -12,16 +12,17 @@ Personal portfolio workspace for **Miguel Silva** — software developer career 
 ## Structure
 
 ```
-Portafolio/
+Portfolio/
 ├── portfolio/         ← Main portfolio website
-├── job-tracker/       ← AI job tracker with Supabase
+├── job-tracker/       ← ApplyTrack (standalone product)
+├── ARCHITECTURE.md    ← Monorepo layout & product boundaries
 ├── DEPLOY.md          ← Step-by-step deploy guide
 └── README.md
 ```
 
 ## Quick start (local)
 
-Each app runs independently:
+From the repo root (`Portfolio/`):
 
 ```bash
 cd portfolio && npm install && npm run dev

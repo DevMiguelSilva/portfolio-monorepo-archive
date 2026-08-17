@@ -14,7 +14,7 @@ Deploy both apps for free using **Vercel** + **Supabase**.
 ## Step 1 — Push to GitHub
 
 ```bash
-cd c:\Users\migue\Desktop\Prueba\Portafolio
+cd c:\Users\migue\Desktop\Portfolio
 git add .
 git commit -m "Your commit message"
 git push origin main
@@ -36,7 +36,7 @@ git push origin main
 
 ## Step 3 — Deploy on Vercel
 
-Go to [vercel.com](https://vercel.com) → **Add New Project** → import `DevMiguelSilva/Portafolio`
+Go to [vercel.com](https://vercel.com) → **Add New Project** → import `DevMiguelSilva/Portfolio`
 
 Deploy **each app as a separate Vercel project** (recommended):
 
