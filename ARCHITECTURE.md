@@ -3,7 +3,7 @@
 This repo is a **monorepo of independent products**, not one embedded app.
 
 ```
-Portfolio/                  ← repo root (workspace)
+C:\Dev\Portfolio/             ← repo root (open this folder in Cursor)
 ├── portfolio/              ← marketing site (about you, project links)
 ├── job-tracker/            ← ApplyTrack (standalone product)
 ├── ARCHITECTURE.md

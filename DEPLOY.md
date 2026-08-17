@@ -14,7 +14,7 @@ Deploy both apps for free using **Vercel** + **Supabase**.
 ## Step 1 — Push to GitHub
 
 ```bash
-cd c:\Users\migue\Desktop\Portfolio
+cd C:\Dev\Portfolio
 git add .
 git commit -m "Your commit message"
 git push origin main

@@ -22,7 +22,7 @@ Portfolio/
 
 ## Quick start (local)
 
-From the repo root (`Portfolio/`):
+From the repo root (`C:\Dev\Portfolio`):
 
 ```bash
 cd portfolio && npm install && npm run dev
