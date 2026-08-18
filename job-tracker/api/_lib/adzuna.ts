@@ -1,4 +1,4 @@
-import { getAdzunaCredentials, type ServerEnv } from './env'
+import { getAdzunaCredentials, type ServerEnv } from './env.js'
 
 export interface AdzunaSearchParams {
   query: string

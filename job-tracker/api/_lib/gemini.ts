@@ -1,4 +1,4 @@
-import { getGeminiApiKey, getGeminiModel, type ServerEnv } from './env'
+import { getGeminiApiKey, getGeminiModel, type ServerEnv } from './env.js'
 
 async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))

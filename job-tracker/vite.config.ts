@@ -1,7 +1,7 @@
 import { defineConfig, loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
-import { routeApi } from './api/_lib/handlers'
-import type { ServerEnv } from './api/_lib/env'
+import { routeApi } from './api/_lib/handlers.js'
+import type { ServerEnv } from './api/_lib/env.js'
 
 function localApiPlugin(env: ServerEnv): Plugin {
   return {

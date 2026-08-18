@@ -1,6 +1,6 @@
-import { searchAdzuna } from './adzuna'
-import type { ServerEnv } from './env'
-import { extractJsonArray, extractJsonObject, generateGeminiText } from './gemini'
+import { searchAdzuna } from './adzuna.js'
+import type { ServerEnv } from './env.js'
+import { extractJsonArray, extractJsonObject, generateGeminiText } from './gemini.js'
 
 export interface ApiResult {
   status: number
