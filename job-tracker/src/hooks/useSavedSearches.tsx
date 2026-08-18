@@ -19,6 +19,18 @@ import { useAuth } from './useAuth'
 const LOCAL_KEY = 'applytrack-saved-searches'
 const SEEDED_KEY = 'applytrack-searches-seeded-v2'
 
+function seededStorageKey(userId?: string | null): string {
+  return userId ? `${SEEDED_KEY}:${userId}` : SEEDED_KEY
+}
+
+function hasSeeded(userId?: string | null): boolean {
+  return localStorage.getItem(seededStorageKey(userId)) === '1'
+}
+
+function markSeeded(userId?: string | null): void {
+  localStorage.setItem(seededStorageKey(userId), '1')
+}
+
 function normalizeSearch(search: SavedSearch): SavedSearch {
   const track =
     search.track === 'frontend' || search.track === 'powerPlatform' || search.track === 'auto'
@@ -87,10 +99,10 @@ export function SavedSearchesProvider({ children }: { children: ReactNode }) {
     try {
       if (!isCloudSync || !supabase || !user) {
         let local = readLocal()
-        if (local.length === 0 && localStorage.getItem(SEEDED_KEY) !== '1') {
+        if (local.length === 0 && !hasSeeded(null)) {
           local = buildDefaultSearches()
           writeLocal(local)
-          localStorage.setItem(SEEDED_KEY, '1')
+          markSeeded(null)
         }
         setSearches(local)
         return
@@ -104,8 +116,14 @@ export function SavedSearchesProvider({ children }: { children: ReactNode }) {
 
       if (error) throw error
 
-      let rows = data ?? []
+      const rows = data ?? []
       if (rows.length === 0) {
+        // Only seed once per user. Empty after delete must stay empty.
+        if (hasSeeded(user.id)) {
+          setSearches([])
+          return
+        }
+
         const defaults = buildDefaultSearches()
         const insertRows = defaults.map((s) => ({
           ...savedSearchToRow(s, user.id),
@@ -115,6 +133,9 @@ export function SavedSearchesProvider({ children }: { children: ReactNode }) {
           .from('saved_searches')
           .insert(insertRows)
           .select()
+
+        markSeeded(user.id)
+
         if (!insertError && inserted) {
           setSearches(inserted.map((r) => normalizeSearch(rowToSavedSearch(r))))
           return
@@ -123,6 +144,8 @@ export function SavedSearchesProvider({ children }: { children: ReactNode }) {
         return
       }
 
+      // Existing rows imply this account already passed first-run seeding
+      markSeeded(user.id)
       setSearches(rows.map((r) => normalizeSearch(rowToSavedSearch(r))))
     } catch (err) {
       console.error('Failed to load saved searches:', err)
@@ -142,10 +165,12 @@ export function SavedSearchesProvider({ children }: { children: ReactNode }) {
         const row = savedSearchToRow(search, user.id)
         const { error } = await supabase.from('saved_searches').insert(row)
         if (error) throw error
+        markSeeded(user.id)
         setSearches((prev) => [...prev, search])
       } else {
         const next = [...searches, search]
         writeLocal(next)
+        markSeeded(null)
         setSearches(next)
       }
     },
@@ -174,18 +199,21 @@ export function SavedSearchesProvider({ children }: { children: ReactNode }) {
 
   const deleteSearch = useCallback(
     async (id: string) => {
-      if (isCloudSync && supabase) {
+      if (isCloudSync && supabase && user) {
         const { error } = await supabase.from('saved_searches').delete().eq('id', id)
         if (error) throw error
-      } else {
-        const next = searches.filter((s) => s.id !== id)
-        writeLocal(next)
-        setSearches(next)
+        // Deleting the last search must not trigger first-run seed on next load
+        markSeeded(user.id)
+        setSearches((prev) => prev.filter((s) => s.id !== id))
         return
       }
-      setSearches((prev) => prev.filter((s) => s.id !== id))
+
+      const next = searches.filter((s) => s.id !== id)
+      writeLocal(next)
+      markSeeded(null)
+      setSearches(next)
     },
-    [isCloudSync, searches]
+    [isCloudSync, user, searches]
   )
 
   const seedDefaults = useCallback(async () => {
