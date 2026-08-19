@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.0",
+    "@vercel/analytics": "^2.0.1",
     "@vercel/node": "^5.9.5",
     "docx": "^9.7.1",
     "jszip": "^3.10.1",

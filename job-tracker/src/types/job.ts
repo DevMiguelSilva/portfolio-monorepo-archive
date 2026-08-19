@@ -24,6 +24,11 @@ export interface JobApplication {
   externalId: string
   matchScore: number | null
   cvTrack: CvTrack | null
+  /**
+   * False when JD is an API listing preview/snippet (Adzuna, etc.).
+   * True after manual paste of the full posting (Add Job or Job Detail enrich).
+   */
+  jdComplete: boolean
   createdAt: string
   updatedAt: string
 }
@@ -142,10 +147,20 @@ export function createEmptyJob(overrides: Partial<JobApplication> = {}): JobAppl
     externalId: '',
     matchScore: null,
     cvTrack: null,
+    jdComplete: true,
     createdAt: now,
     updatedAt: now,
     ...overrides,
   }
+}
+
+/** Legacy rows without the flag: treat non-manual sources as incomplete snippets. */
+export function resolveJdComplete(job: {
+  jdComplete?: boolean | null
+  source?: string | null
+}): boolean {
+  if (typeof job.jdComplete === 'boolean') return job.jdComplete
+  return !job.source || job.source === 'manual'
 }
 
 export function createEmptySavedSearch(overrides: Partial<SavedSearch> = {}): SavedSearch {

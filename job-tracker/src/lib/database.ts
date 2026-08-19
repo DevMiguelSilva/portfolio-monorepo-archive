@@ -1,6 +1,7 @@
 import type { CvTrack, GapReport, MasterCv, TailoredDocument } from '../types/cv'
 import { EMPTY_GAP_REPORT } from '../types/cv'
 import type { InboxJob, JobApplication, SavedSearch, SearchTrack, UserProfile } from '../types/job'
+import { resolveJdComplete } from '../types/job'
 
 export interface JobRow {
   id: string
@@ -21,6 +22,7 @@ export interface JobRow {
   external_id?: string
   match_score?: number | null
   cv_track?: string | null
+  jd_complete?: boolean | null
   created_at: string
   updated_at: string
 }
@@ -119,6 +121,10 @@ export function rowToJob(row: JobRow): JobApplication {
     externalId: row.external_id ?? '',
     matchScore: row.match_score ?? null,
     cvTrack: asCvTrack(row.cv_track),
+    jdComplete: resolveJdComplete({
+      jdComplete: row.jd_complete ?? undefined,
+      source: row.source ?? 'manual',
+    }),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -144,6 +150,7 @@ export function jobToRow(job: JobApplication, userId: string): Omit<JobRow, 'cre
     external_id: job.externalId,
     match_score: job.matchScore,
     cv_track: job.cvTrack,
+    jd_complete: job.jdComplete,
   }
 }
 

@@ -316,6 +316,8 @@ export function InboxProvider({ children }: { children: ReactNode }) {
         externalId: item.externalId,
         matchScore: coverage.score,
         cvTrack: track,
+        // API listings are usually snippets — paste full JD on Job Detail to complete.
+        jdComplete: false,
       })
 
       await addJob(job)

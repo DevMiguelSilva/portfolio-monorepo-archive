@@ -10,7 +10,7 @@ import {
 import { jobToRow, rowToJob } from '../lib/database'
 import { supabase } from '../lib/supabase'
 import type { JobApplication, JobStatus } from '../types/job'
-import { createEmptyJob } from '../types/job'
+import { createEmptyJob, resolveJdComplete } from '../types/job'
 import { useAuth } from './useAuth'
 
 const LOCAL_STORAGE_KEY = 'job-tracker-applications'
@@ -44,6 +44,10 @@ function normalizeJob(job: JobApplication): JobApplication {
     jdSummary: job.jdSummary ?? '',
     extractedSkills: job.extractedSkills ?? [],
     extractedRequirements: job.extractedRequirements ?? [],
+    jdComplete: resolveJdComplete({
+      jdComplete: job.jdComplete,
+      source: job.source ?? 'manual',
+    }),
   }
 }
 

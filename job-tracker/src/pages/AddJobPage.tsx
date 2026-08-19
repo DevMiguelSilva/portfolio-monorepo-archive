@@ -71,6 +71,7 @@ export function AddJobPage() {
         jobDescription: fullJd,
         cvTrack: track,
         matchScore: match.score,
+        jdComplete: Boolean(fullJd),
       })
       navigate(`/job/${form.id}`)
     } catch (err) {

@@ -28,6 +28,7 @@ create table if not exists job_applications (
   source text not null default 'manual',
   external_id text not null default '',
   match_score integer,
+  jd_complete boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -37,6 +38,13 @@ alter table job_applications add column if not exists source text not null defau
 alter table job_applications add column if not exists external_id text not null default '';
 alter table job_applications add column if not exists match_score integer;
 alter table job_applications add column if not exists jd_summary text not null default '';
+alter table job_applications add column if not exists jd_complete boolean;
+update job_applications
+set jd_complete = (coalesce(source, 'manual') = 'manual')
+where jd_complete is null;
+alter table job_applications alter column jd_complete set default true;
+update job_applications set jd_complete = true where jd_complete is null;
+alter table job_applications alter column jd_complete set not null;
 
 create table if not exists saved_searches (
   id uuid primary key default gen_random_uuid(),

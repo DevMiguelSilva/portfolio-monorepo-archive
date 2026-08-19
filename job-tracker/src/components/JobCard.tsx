@@ -43,7 +43,14 @@ export function JobCard({ job, isDragging, onDragStart, onDragEnd }: JobCardProp
             )}
           </div>
         )}
-        <StatusBadge status={job.status} />
+        <div className="flex flex-wrap items-center gap-1.5">
+          <StatusBadge status={job.status} />
+          {!job.jdComplete && (
+            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
+              JD incomplete
+            </span>
+          )}
+        </div>
       </Link>
     </article>
   )

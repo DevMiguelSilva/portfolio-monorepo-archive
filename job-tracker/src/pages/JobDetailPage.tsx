@@ -1,10 +1,18 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { parseJobPosting } from '../api/gemini'
 import { InterviewPrepPanel } from '../components/InterviewPrepPanel'
 import { StatusBadge } from '../components/StatusBadge'
 import { TailorPanel } from '../components/TailorPanel'
 import { useJobs } from '../hooks/useJobs'
 import { useMasterCv } from '../hooks/useMasterCv'
+import {
+  formAccentBtnClass,
+  formControlClass,
+  formLabelClass,
+  formPanelClass,
+  formPrimaryBtnClass,
+} from '../lib/formUi'
 import { formatDualTrackScores, scoreDualTracks, scoreMasterCvAgainstJob } from '../lib/matchScore'
 import { CV_TRACK_LABELS, CV_TRACKS, type CvTrack } from '../types/cv'
 
@@ -16,6 +24,11 @@ export function JobDetailPage() {
   const job = id ? getJob(id) : undefined
   const [showFullJd, setShowFullJd] = useState(false)
   const [editingTrack, setEditingTrack] = useState(false)
+  const [editingJd, setEditingJd] = useState(false)
+  const [jdDraft, setJdDraft] = useState('')
+  const [savingJd, setSavingJd] = useState(false)
+  const [parsingJd, setParsingJd] = useState(false)
+  const [jdError, setJdError] = useState<string | null>(null)
 
   const dual = useMemo(() => {
     if (!job) return null
@@ -49,6 +62,7 @@ export function JobDetailPage() {
   const showInterviewPrep = job.status === 'interview'
   const hasUrl = Boolean(job.jobUrl.trim())
   const selectedScore = dual?.[selectedTrack].score ?? job.matchScore
+  const jdIncomplete = !job.jdComplete
 
   const applyTrack = async (track: CvTrack) => {
     const match = scoreMasterCvAgainstJob(
@@ -60,6 +74,87 @@ export function JobDetailPage() {
     setEditingTrack(false)
   }
 
+  const openJdEditor = () => {
+    setJdDraft(job.jobDescription)
+    setJdError(null)
+    setEditingJd(true)
+    setShowFullJd(true)
+  }
+
+  const saveJd = async (withParse: boolean) => {
+    const fullJd = jdDraft.trim()
+    if (!fullJd) {
+      setJdError('Paste the full job description before saving.')
+      return
+    }
+
+    setSavingJd(true)
+    setJdError(null)
+    try {
+      let jdSummary = job.jdSummary
+      let extractedSkills = job.extractedSkills
+      let extractedRequirements = job.extractedRequirements
+      let company = job.company
+      let role = job.role
+      let location = job.location
+      let salary = job.salary
+
+      if (withParse) {
+        setParsingJd(true)
+        try {
+          const parsed = await parseJobPosting(fullJd)
+          jdSummary = parsed.summary || jdSummary
+          if (parsed.skills?.length) extractedSkills = parsed.skills
+          else extractedSkills = []
+          if (parsed.requirements?.length) extractedRequirements = parsed.requirements
+          if (parsed.company) company = parsed.company
+          if (parsed.role) role = parsed.role
+          if (parsed.location) location = parsed.location
+          if (parsed.salary) salary = parsed.salary
+        } catch (err) {
+          // Still save the JD + rescore even if Gemini is down
+          setJdError(
+            err instanceof Error
+              ? `${err.message} — saved description and rescored without AI parse.`
+              : 'AI parse failed — saved description and rescored without AI parse.'
+          )
+          extractedSkills = []
+        } finally {
+          setParsingJd(false)
+        }
+      } else {
+        // Drop snippet-era skills so match mines keywords from the full JD text
+        extractedSkills = []
+      }
+
+      const track = job.cvTrack ?? activeTrack
+      const match = scoreMasterCvAgainstJob(
+        `${role}\n${fullJd}`,
+        getCv(track),
+        extractedSkills
+      )
+
+      await updateJob(job.id, {
+        jobDescription: fullJd,
+        jdSummary,
+        extractedSkills: extractedSkills.length ? extractedSkills : match.targets,
+        extractedRequirements,
+        company,
+        role,
+        location,
+        salary,
+        matchScore: match.score,
+        jdComplete: true,
+      })
+      setEditingJd(false)
+    } catch (err) {
+      setJdError(err instanceof Error ? err.message : 'Failed to update job description')
+    } finally {
+      setSavingJd(false)
+      setParsingJd(false)
+    }
+  }
+
   return (
     <div className="space-y-8">
       <Link to="/" className="text-sm text-slate-500 hover:text-track-accent dark:text-slate-400">
@@ -68,7 +163,14 @@ export function JobDetailPage() {
 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <StatusBadge status={job.status} size="md" />
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge status={job.status} size="md" />
+            {jdIncomplete && (
+              <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
+                JD incomplete
+              </span>
+            )}
+          </div>
           <h1 className="mt-2 text-3xl font-bold">{job.role}</h1>
           <p className="text-lg text-slate-500 dark:text-slate-400">{job.company}</p>
           <div className="mt-2 flex flex-wrap gap-3 text-sm text-slate-500 dark:text-slate-400">
@@ -80,6 +182,7 @@ export function JobDetailPage() {
             {selectedScore != null && (
               <span>
                 🎯 {selectedScore}% · {CV_TRACK_LABELS[selectedTrack]}
+                {jdIncomplete ? ' (preview)' : ''}
               </span>
             )}
             {job.source && job.source !== 'manual' && <span>via {job.source}</span>}
@@ -168,12 +271,97 @@ export function JobDetailPage() {
         </div>
       </section>
 
+      {(jdIncomplete || editingJd) && (
+        <section
+          className={`space-y-3 rounded-xl border p-5 ${
+            jdIncomplete
+              ? 'border-amber-300 bg-amber-50/60 dark:border-amber-800 dark:bg-amber-950/20'
+              : 'border-slate-200 bg-white dark:border-track-700 dark:bg-track-800'
+          }`}
+        >
+          <div>
+            <h2 className="font-semibold">
+              {jdIncomplete ? 'Complete the job description' : 'Update job description'}
+            </h2>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+              {jdIncomplete
+                ? 'This listing came from an API preview. Open the posting, copy the full JD, paste it here, then save to refresh match %.'
+                : 'Replace the stored JD and recalculate match against your Master CV.'}
+            </p>
+          </div>
+
+          {!editingJd ? (
+            <button type="button" onClick={openJdEditor} className={formAccentBtnClass}>
+              Paste full job description
+            </button>
+          ) : (
+            <div className={formPanelClass}>
+              <label className="block">
+                <span className={formLabelClass}>Full job description</span>
+                <textarea
+                  value={jdDraft}
+                  onChange={(e) => setJdDraft(e.target.value)}
+                  rows={12}
+                  placeholder="Paste the complete job posting here…"
+                  className={`${formControlClass} font-mono text-xs leading-relaxed`}
+                />
+              </label>
+              {jdError && (
+                <p className="text-sm text-amber-700 dark:text-amber-300" role="alert">
+                  {jdError}
+                </p>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={savingJd || parsingJd}
+                  onClick={() => saveJd(true)}
+                  className={`${formAccentBtnClass} disabled:opacity-60`}
+                >
+                  {parsingJd ? 'Parsing…' : savingJd ? 'Saving…' : 'Parse, save & rescore'}
+                </button>
+                <button
+                  type="button"
+                  disabled={savingJd || parsingJd}
+                  onClick={() => saveJd(false)}
+                  className={`${formPrimaryBtnClass} disabled:opacity-60`}
+                >
+                  {savingJd && !parsingJd ? 'Saving…' : 'Save & rescore'}
+                </button>
+                <button
+                  type="button"
+                  disabled={savingJd || parsingJd}
+                  onClick={() => {
+                    setEditingJd(false)
+                    setJdError(null)
+                  }}
+                  className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm dark:border-track-700"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
       {(job.jdSummary ||
         job.extractedSkills.length > 0 ||
         job.extractedRequirements.length > 0 ||
         job.jobDescription) && (
         <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 dark:border-track-700 dark:bg-track-800">
-          <h2 className="font-semibold">Posting overview</h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-semibold">Posting overview</h2>
+            {job.jdComplete && !editingJd && (
+              <button
+                type="button"
+                onClick={openJdEditor}
+                className="text-xs font-medium text-track-accent hover:underline"
+              >
+                Update JD
+              </button>
+            )}
+          </div>
           {job.jdSummary && (
             <div>
               <h3 className="mb-1 text-sm font-medium text-slate-500">AI summary</h3>
@@ -219,13 +407,17 @@ export function JobDetailPage() {
                 className="text-sm font-medium text-track-accent hover:underline"
                 aria-expanded={showFullJd}
               >
-                {showFullJd ? 'Hide full job description' : 'Show full job description'}
+                {showFullJd
+                  ? 'Hide job description'
+                  : jdIncomplete
+                    ? 'Show listing preview'
+                    : 'Show full job description'}
               </button>
               {showFullJd && (
                 <div
                   className="mt-3 max-h-[28rem] overflow-y-auto whitespace-pre-wrap text-sm leading-relaxed text-slate-700 dark:text-slate-300"
                   role="region"
-                  aria-label="Full job description"
+                  aria-label="Job description"
                 >
                   {job.jobDescription}
                 </div>
@@ -233,8 +425,7 @@ export function JobDetailPage() {
             </div>
           ) : (
             <p className="text-sm text-slate-500">
-              No full JD saved yet. Include the posting when you add the job (or from Inbox) if you
-              need it for match scoring and interview prep.
+              No JD saved yet. Paste the full posting above to unlock accurate match scoring.
             </p>
           )}
         </section>
