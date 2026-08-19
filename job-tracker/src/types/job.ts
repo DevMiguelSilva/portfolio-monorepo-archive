@@ -154,13 +154,57 @@ export function createEmptyJob(overrides: Partial<JobApplication> = {}): JobAppl
   }
 }
 
-/** Legacy rows without the flag: treat non-manual sources as incomplete snippets. */
+/** API providers that typically return listing previews, not a full pasted JD. */
+const SNIPPET_SOURCES = new Set(['adzuna'])
+
+/** Legacy rows without the flag: API snippets incomplete; portal/manual assumed full. */
 export function resolveJdComplete(job: {
   jdComplete?: boolean | null
   source?: string | null
 }): boolean {
   if (typeof job.jdComplete === 'boolean') return job.jdComplete
-  return !job.source || job.source === 'manual'
+  const source = (job.source || 'manual').trim().toLowerCase()
+  if (SNIPPET_SOURCES.has(source)) return false
+  return true
+}
+
+/** Display labels for job/inbox provenance (APIs + portals). */
+export const JOB_SOURCE_LABELS: Record<string, string> = {
+  manual: 'Manual',
+  adzuna: 'Adzuna',
+  indeed: 'Indeed',
+  ziprecruiter: 'ZipRecruiter',
+  linkedin: 'LinkedIn',
+  other: 'Other',
+}
+
+/** Sources shown in Add Job / edit dropdowns (inbox APIs still set adzuna in code). */
+export const MANUAL_JOB_SOURCE_OPTIONS = [
+  'manual',
+  'indeed',
+  'ziprecruiter',
+  'linkedin',
+  'other',
+] as const
+
+export type ManualJobSource = (typeof MANUAL_JOB_SOURCE_OPTIONS)[number]
+
+export function jobSourceLabel(source: string | null | undefined): string {
+  const key = (source || 'manual').trim().toLowerCase()
+  if (JOB_SOURCE_LABELS[key]) return JOB_SOURCE_LABELS[key]
+  if (!key) return 'Manual'
+  return key.charAt(0).toUpperCase() + key.slice(1)
+}
+
+/** Infer board/API from a posting URL (empty → manual). */
+export function guessJobSourceFromUrl(url: string): string {
+  const u = url.trim().toLowerCase()
+  if (!u) return 'manual'
+  if (u.includes('indeed.')) return 'indeed'
+  if (u.includes('ziprecruiter.')) return 'ziprecruiter'
+  if (u.includes('linkedin.')) return 'linkedin'
+  if (u.includes('adzuna.')) return 'adzuna'
+  return 'other'
 }
 
 export function createEmptySavedSearch(overrides: Partial<SavedSearch> = {}): SavedSearch {

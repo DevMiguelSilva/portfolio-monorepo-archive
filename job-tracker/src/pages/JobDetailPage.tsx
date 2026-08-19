@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { parseJobPosting } from '../api/gemini'
 import { InterviewPrepPanel } from '../components/InterviewPrepPanel'
+import { SourceBadge } from '../components/SourceBadge'
 import { StatusBadge } from '../components/StatusBadge'
 import { TailorPanel } from '../components/TailorPanel'
 import { useJobs } from '../hooks/useJobs'
@@ -15,6 +16,12 @@ import {
 } from '../lib/formUi'
 import { formatDualTrackScores, scoreDualTracks, scoreMasterCvAgainstJob } from '../lib/matchScore'
 import { CV_TRACK_LABELS, CV_TRACKS, type CvTrack } from '../types/cv'
+import {
+  guessJobSourceFromUrl,
+  JOB_SOURCE_LABELS,
+  MANUAL_JOB_SOURCE_OPTIONS,
+  jobSourceLabel,
+} from '../types/job'
 
 export function JobDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -24,6 +31,7 @@ export function JobDetailPage() {
   const job = id ? getJob(id) : undefined
   const [showFullJd, setShowFullJd] = useState(false)
   const [editingTrack, setEditingTrack] = useState(false)
+  const [editingSource, setEditingSource] = useState(false)
   const [editingJd, setEditingJd] = useState(false)
   const [jdDraft, setJdDraft] = useState('')
   const [savingJd, setSavingJd] = useState(false)
@@ -165,6 +173,7 @@ export function JobDetailPage() {
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={job.status} size="md" />
+            <SourceBadge source={job.source} size="md" />
             {jdIncomplete && (
               <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
                 JD incomplete
@@ -185,7 +194,6 @@ export function JobDetailPage() {
                 {jdIncomplete ? ' (preview)' : ''}
               </span>
             )}
-            {job.source && job.source !== 'manual' && <span>via {job.source}</span>}
           </div>
           {dual && (
             <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
@@ -227,6 +235,63 @@ export function JobDetailPage() {
           ) : (
             <p className="mt-1 text-sm text-slate-400">No URL on this job</p>
           )}
+          <div className="mt-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-medium text-slate-500">Source</span>
+              {!editingSource && (
+                <button
+                  type="button"
+                  onClick={() => setEditingSource(true)}
+                  className="text-xs font-medium text-track-accent hover:underline"
+                >
+                  Edit
+                </button>
+              )}
+            </div>
+            {editingSource ? (
+              <div className="mt-1 space-y-2">
+                <select
+                  value={job.source || 'manual'}
+                  onChange={async (e) => {
+                    await updateJob(job.id, { source: e.target.value })
+                    setEditingSource(false)
+                  }}
+                  className={formControlClass}
+                >
+                  {Array.from(
+                    new Set<string>([...MANUAL_JOB_SOURCE_OPTIONS, 'adzuna', job.source || 'manual'])
+                  ).map((value) => (
+                    <option key={value} value={value}>
+                      {JOB_SOURCE_LABELS[value] ?? jobSourceLabel(value)}
+                    </option>
+                  ))}
+                </select>
+                {hasUrl && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await updateJob(job.id, { source: guessJobSourceFromUrl(job.jobUrl) })
+                      setEditingSource(false)
+                    }}
+                    className="text-xs font-medium text-track-accent hover:underline"
+                  >
+                    Detect from URL
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setEditingSource(false)}
+                  className="ml-3 text-xs text-slate-500 hover:underline"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div className="mt-1">
+                <SourceBadge source={job.source} size="md" />
+              </div>
+            )}
+          </div>
         </div>
         <div>
           <div className="flex items-center justify-between gap-2">

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { LoadingSpinner } from '../components/LoadingSpinner'
+import { SourceBadge } from '../components/SourceBadge'
 import { useInbox } from '../hooks/useInbox'
 import { useSavedSearches } from '../hooks/useSavedSearches'
 import { parseDualTrackReason } from '../lib/matchScore'
@@ -307,7 +308,7 @@ export function InboxPage() {
                       {job.matchScore}%
                       {job.matchedTrack ? ` · ${CV_TRACK_LABELS[job.matchedTrack]}` : ' match'}
                     </span>
-                    <span className="text-xs uppercase tracking-wide text-slate-400">{job.source}</span>
+                    <SourceBadge source={job.source} />
                   </div>
                   {(() => {
                     const dual = parseDualTrackReason(job.matchReasons)

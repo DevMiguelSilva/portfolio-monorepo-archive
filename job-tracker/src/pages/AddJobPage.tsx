@@ -12,7 +12,14 @@ import {
 } from '../lib/formUi'
 import { scoreMasterCvAgainstJob } from '../lib/matchScore'
 import { CV_TRACK_LABELS, CV_TRACKS, type CvTrack } from '../types/cv'
-import { createEmptyJob, STATUS_ORDER, type JobStatus } from '../types/job'
+import {
+  createEmptyJob,
+  guessJobSourceFromUrl,
+  JOB_SOURCE_LABELS,
+  MANUAL_JOB_SOURCE_OPTIONS,
+  STATUS_ORDER,
+  type JobStatus,
+} from '../types/job'
 
 export function AddJobPage() {
   const navigate = useNavigate()
@@ -22,9 +29,19 @@ export function AddJobPage() {
   const [pasteText, setPasteText] = useState('')
   const [parsing, setParsing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /** Once the user picks Source manually, stop overwriting from URL. */
+  const [sourceLocked, setSourceLocked] = useState(false)
 
   const update = (field: keyof typeof form, value: string | JobStatus | CvTrack | null) => {
     setForm((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const setJobUrl = (url: string) => {
+    setForm((prev) => ({
+      ...prev,
+      jobUrl: url,
+      source: sourceLocked ? prev.source : guessJobSourceFromUrl(url),
+    }))
   }
 
   const handleParseAndFill = async () => {
@@ -176,10 +193,39 @@ export function AddJobPage() {
             <input
               type="url"
               value={form.jobUrl}
-              onChange={(e) => update('jobUrl', e.target.value)}
-              placeholder="https://indeed.com/… or ZipRecruiter link"
+              onChange={(e) => setJobUrl(e.target.value)}
+              placeholder="https://indeed.com/… or LinkedIn / ZipRecruiter link"
               className={formControlClass}
             />
+            <p className="mt-0.5 text-xs text-slate-400">
+              Used to auto-detect source (Indeed, LinkedIn, ZipRecruiter…).
+            </p>
+          </label>
+          <label className="block">
+            <span className={formLabelClass}>Source</span>
+            <select
+              value={
+                MANUAL_JOB_SOURCE_OPTIONS.includes(
+                  form.source as (typeof MANUAL_JOB_SOURCE_OPTIONS)[number]
+                )
+                  ? form.source
+                  : 'other'
+              }
+              onChange={(e) => {
+                setSourceLocked(true)
+                update('source', e.target.value)
+              }}
+              className={formControlClass}
+            >
+              {MANUAL_JOB_SOURCE_OPTIONS.map((value) => (
+                <option key={value} value={value}>
+                  {JOB_SOURCE_LABELS[value]}
+                </option>
+              ))}
+            </select>
+            <p className="mt-0.5 text-xs text-slate-400">
+              Where you found this posting — shown on the board for tracking.
+            </p>
           </label>
           <label className="block">
             <span className={formLabelClass}>
