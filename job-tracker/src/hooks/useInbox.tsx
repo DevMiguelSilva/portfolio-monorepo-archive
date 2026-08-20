@@ -129,14 +129,15 @@ export function InboxProvider({ children }: { children: ReactNode }) {
 
   const persistAll = useCallback(
     async (next: InboxJob[]) => {
-      setInbox(next)
       if (!isCloudSync || !supabase || !user) {
         writeLocal(next)
+        setInbox(next)
         return
       }
       const rows = next.map((item) => inboxJobToRow(item, user.id))
       const { error } = await supabase.from('job_inbox').upsert(rows)
       if (error) throw error
+      setInbox(next)
     },
     [isCloudSync, user]
   )
@@ -172,6 +173,10 @@ export function InboxProvider({ children }: { children: ReactNode }) {
         seenCountForRefresh.set(externalId, count)
         return count
       }
+
+      /** Every Adzuna hit this refresh (including already-approved), for empty/park guards. */
+      const apiReturnedIds = new Set<string>()
+      let skippedApproved = 0
 
       for (const search of active) {
         const legs = expandSearchLocations(search.location)
@@ -209,11 +214,13 @@ export function InboxProvider({ children }: { children: ReactNode }) {
         }
 
         for (const result of resultsById.values()) {
+          apiReturnedIds.add(result.externalId)
           const existing = existingByExternal.get(result.externalId)
           const now = new Date().toISOString()
 
           // Already on the board (or approved in inbox) — keep history, don't resurface as new
           if (existing?.status === 'approved' || approvedExternal.has(result.externalId)) {
+            skippedApproved += 1
             if (existing?.status === 'approved') {
               merged.set(result.externalId, {
                 ...existing,
@@ -263,12 +270,21 @@ export function InboxProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      // Adzuna sometimes returns an empty page (outage / rate / flaky). Never wipe the inbox.
+      if (apiReturnedIds.size === 0) {
+        setRefreshError(
+          'Adzuna returned 0 jobs for your active searches. Inbox left unchanged — try again shortly, or widen query/location.'
+        )
+        return
+      }
+
       // Previous "new" rows that no search returned this round → park as dismissed
       // (history kept; a later refresh can resurface them as "Seen before").
+      // Only do this when Adzuna actually returned hits, so an empty response can't clear the list.
       const parkNow = new Date().toISOString()
       for (const [externalId, item] of merged) {
         if (item.status !== 'new') continue
-        if (seenCountForRefresh.has(externalId)) continue
+        if (apiReturnedIds.has(externalId)) continue
         if (new Date(item.fetchedAt).getTime() >= refreshStartedMs) continue
         merged.set(externalId, {
           ...item,
@@ -279,6 +295,17 @@ export function InboxProvider({ children }: { children: ReactNode }) {
 
       const next = [...merged.values()].sort((a, b) => b.matchScore - a.matchScore)
       await persistAll(next)
+
+      const visibleNew = next.filter((i) => i.status === 'new').length
+      if (visibleNew === 0 && skippedApproved > 0) {
+        setRefreshError(
+          `Adzuna returned ${apiReturnedIds.size} listing(s), but all were already approved / on your board — nothing new to review.`
+        )
+      } else if (visibleNew === 0) {
+        setRefreshError(
+          `Adzuna returned ${apiReturnedIds.size} listing(s), but none are left to review (dismissed history may still resurface next time).`
+        )
+      }
     } catch (err) {
       setRefreshError(err instanceof Error ? err.message : 'Refresh failed')
       throw err

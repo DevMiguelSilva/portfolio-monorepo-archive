@@ -316,7 +316,9 @@ export function InboxPage() {
         <div className="rounded-xl border border-dashed border-slate-300 p-12 text-center dark:border-track-700">
           <h3 className="font-semibold">Inbox is empty</h3>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Click Refresh inbox to pull roles from your saved searches.
+            Click Refresh inbox to pull roles from your saved searches. If refresh finds only jobs
+            you already approved, or Adzuna returns nothing, the list stays empty — check the
+            message above after refreshing.
           </p>
         </div>
       ) : (
