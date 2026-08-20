@@ -80,11 +80,18 @@ create table if not exists job_inbox (
   match_reasons jsonb not null default '[]'::jsonb,
   status text not null default 'new' check (status in ('new', 'approved', 'dismissed')),
   saved_search_id uuid references saved_searches on delete set null,
+  seen_count integer not null default 1,
   fetched_at timestamptz not null default now(),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (user_id, external_id)
 );
+
+alter table job_inbox add column if not exists seen_count integer;
+update job_inbox set seen_count = 1 where seen_count is null;
+alter table job_inbox alter column seen_count set default 1;
+update job_inbox set seen_count = 1 where seen_count is null;
+alter table job_inbox alter column seen_count set not null;
 
 create table if not exists master_cvs (
   id uuid primary key default gen_random_uuid(),

@@ -67,6 +67,7 @@ export interface InboxRow {
   matched_track?: string | null
   status: InboxJob['status']
   saved_search_id: string | null
+  seen_count?: number | null
   fetched_at: string
   created_at: string
   updated_at: string
@@ -225,6 +226,7 @@ export function rowToInboxJob(row: InboxRow): InboxJob {
     matchedTrack: asCvTrack(row.matched_track),
     status: row.status,
     savedSearchId: row.saved_search_id,
+    seenCount: row.seen_count && row.seen_count > 0 ? row.seen_count : 1,
     fetchedAt: row.fetched_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -251,6 +253,7 @@ export function inboxJobToRow(
     matched_track: job.matchedTrack,
     status: job.status,
     saved_search_id: job.savedSearchId,
+    seen_count: job.seenCount > 0 ? job.seenCount : 1,
     fetched_at: job.fetchedAt,
     updated_at: new Date().toISOString(),
   }

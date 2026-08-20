@@ -81,6 +81,11 @@ export interface InboxJob {
   matchedTrack: CvTrack | null
   status: InboxStatus
   savedSearchId: string | null
+  /**
+   * How many inbox refreshes have returned this listing.
+   * 1 = first time seen; >1 = matched again (dismissed ones can come back).
+   */
+  seenCount: number
   fetchedAt: string
   createdAt: string
   updatedAt: string

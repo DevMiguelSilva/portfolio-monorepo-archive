@@ -49,6 +49,7 @@ function readLocal(): InboxJob[] {
       ...item,
       matchedTrack: item.matchedTrack ?? null,
       matchReasons: item.matchReasons ?? [],
+      seenCount: item.seenCount && item.seenCount > 0 ? item.seenCount : 1,
     }))
   } catch {
     return []
@@ -155,8 +156,21 @@ export function InboxProvider({ children }: { children: ReactNode }) {
       )
 
       const merged = new Map<string, InboxJob>()
+      // Keep full inbox history so seenCount / dismissed jobs survive when a listing
+      // is missing from one refresh and returns later.
       for (const item of inbox) {
-        if (item.status !== 'new') merged.set(item.externalId, item)
+        merged.set(item.externalId, item)
+      }
+      const refreshStartedMs = Date.now()
+
+      /** seenCount increments once per refresh per listing (not once per matching search). */
+      const seenCountForRefresh = new Map<string, number>()
+      const nextSeenCount = (externalId: string, existing?: InboxJob) => {
+        const cached = seenCountForRefresh.get(externalId)
+        if (cached != null) return cached
+        const count = existing ? (existing.seenCount > 0 ? existing.seenCount : 1) + 1 : 1
+        seenCountForRefresh.set(externalId, count)
+        return count
       }
 
       for (const search of active) {
@@ -196,26 +210,38 @@ export function InboxProvider({ children }: { children: ReactNode }) {
 
         for (const result of resultsById.values()) {
           const existing = existingByExternal.get(result.externalId)
-          if (existing?.status === 'dismissed' || existing?.status === 'approved') {
-            merged.set(result.externalId, {
-              ...existing,
-              description: result.description || existing.description,
-              fetchedAt: new Date().toISOString(),
-            })
+          const now = new Date().toISOString()
+
+          // Already on the board (or approved in inbox) — keep history, don't resurface as new
+          if (existing?.status === 'approved' || approvedExternal.has(result.externalId)) {
+            if (existing?.status === 'approved') {
+              merged.set(result.externalId, {
+                ...existing,
+                description: result.description || existing.description,
+                fetchedAt: now,
+              })
+            }
             continue
           }
-          if (approvedExternal.has(result.externalId)) continue
 
           const jobText = `${result.role}\n${result.description}`
           const match = pickMatch(jobText, search.track ?? 'auto', cvsByTrack)
-          const now = new Date().toISOString()
-          const prevNew = merged.get(result.externalId)
-          if (prevNew?.status === 'new' && prevNew.matchScore >= match.score) {
+          const prevMerged = merged.get(result.externalId)
+          const seenCount = nextSeenCount(result.externalId, existing)
+
+          // Already have a better/equal hit this refresh — keep it, but mark as returned
+          if (prevMerged?.status === 'new' && prevMerged.matchScore >= match.score) {
+            merged.set(result.externalId, {
+              ...prevMerged,
+              seenCount,
+              fetchedAt: now,
+              updatedAt: now,
+            })
             continue
           }
 
           merged.set(result.externalId, {
-            id: existing?.id ?? prevNew?.id ?? crypto.randomUUID(),
+            id: existing?.id ?? prevMerged?.id ?? crypto.randomUUID(),
             externalId: result.externalId,
             source: 'adzuna',
             company: result.company,
@@ -229,11 +255,26 @@ export function InboxProvider({ children }: { children: ReactNode }) {
             matchedTrack: match.track,
             status: 'new',
             savedSearchId: search.id,
+            seenCount,
             fetchedAt: now,
-            createdAt: existing?.createdAt ?? prevNew?.createdAt ?? now,
+            createdAt: existing?.createdAt ?? prevMerged?.createdAt ?? now,
             updatedAt: now,
           })
         }
+      }
+
+      // Previous "new" rows that no search returned this round → park as dismissed
+      // (history kept; a later refresh can resurface them as "Seen before").
+      const parkNow = new Date().toISOString()
+      for (const [externalId, item] of merged) {
+        if (item.status !== 'new') continue
+        if (seenCountForRefresh.has(externalId)) continue
+        if (new Date(item.fetchedAt).getTime() >= refreshStartedMs) continue
+        merged.set(externalId, {
+          ...item,
+          status: 'dismissed',
+          updatedAt: parkNow,
+        })
       }
 
       const next = [...merged.values()].sort((a, b) => b.matchScore - a.matchScore)

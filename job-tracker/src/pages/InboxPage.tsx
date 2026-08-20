@@ -42,6 +42,23 @@ export function InboxPage() {
     [inbox]
   )
 
+  const searchLabelById = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const s of searches) {
+      map.set(s.id, s.label.trim() || s.query.trim() || 'Saved search')
+    }
+    return map
+  }, [searches])
+
+  const firstSeenCount = useMemo(
+    () => newJobs.filter((j) => (j.seenCount ?? 1) <= 1).length,
+    [newJobs]
+  )
+  const seenBeforeCount = useMemo(
+    () => newJobs.filter((j) => (j.seenCount ?? 1) > 1).length,
+    [newJobs]
+  )
+
   const handleRefresh = async () => {
     setError(null)
     try {
@@ -124,8 +141,9 @@ export function InboxPage() {
           </Link>
           <h1 className="mt-2 text-2xl font-bold">Job Inbox</h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
-            Refresh saved Canada searches (Adzuna), rank by the matching Master CV track, then
-            approve into your tracker or dismiss.
+            Refresh saved Canada searches (Adzuna), rank by Master CV track, then approve or dismiss.
+            Dismiss hides a role until the next refresh — if a search finds it again, it comes back
+            labeled Seen before so you can tell new hits from repeats.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -148,7 +166,22 @@ export function InboxPage() {
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-track-700 dark:bg-track-800">
-        <span className="font-semibold text-track-accent">{newCount}</span> new roles ready to review
+        <span className="font-semibold text-track-accent">{newCount}</span> roles ready to review
+        {newCount > 0 && (
+          <span className="text-slate-500 dark:text-slate-400">
+            {' '}
+            · <span className="font-medium text-emerald-600 dark:text-emerald-400">{firstSeenCount}</span>{' '}
+            first time
+            {seenBeforeCount > 0 && (
+              <>
+                {' '}
+                ·{' '}
+                <span className="font-medium text-amber-700 dark:text-amber-300">{seenBeforeCount}</span>{' '}
+                seen before
+              </>
+            )}
+          </span>
+        )}
       </div>
 
       {(error || refreshError) && (
@@ -309,6 +342,18 @@ export function InboxPage() {
                       {job.matchedTrack ? ` · ${CV_TRACK_LABELS[job.matchedTrack]}` : ' match'}
                     </span>
                     <SourceBadge source={job.source} />
+                    {(job.seenCount ?? 1) > 1 ? (
+                      <span
+                        className="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 ring-1 ring-inset ring-amber-300/80 dark:bg-amber-950/50 dark:text-amber-300 dark:ring-amber-700"
+                        title={`This listing matched again (seen ${job.seenCount} refreshes). Useful to compare which searches keep surfacing it.`}
+                      >
+                        Seen before · ×{job.seenCount}
+                      </span>
+                    ) : (
+                      <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-inset ring-emerald-300/80 dark:bg-emerald-950/50 dark:text-emerald-300 dark:ring-emerald-700">
+                        New
+                      </span>
+                    )}
                   </div>
                   {(() => {
                     const dual = parseDualTrackReason(job.matchReasons)
@@ -324,6 +369,11 @@ export function InboxPage() {
                   <div className="mt-1 flex flex-wrap gap-3 text-sm text-slate-500">
                     {job.location && <span>{job.location}</span>}
                     {job.salary && <span>{job.salary}</span>}
+                    {job.savedSearchId && searchLabelById.get(job.savedSearchId) && (
+                      <span className="font-medium text-slate-600 dark:text-slate-300">
+                        via search: {searchLabelById.get(job.savedSearchId)}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
