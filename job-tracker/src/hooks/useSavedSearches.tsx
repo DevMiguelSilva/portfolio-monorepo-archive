@@ -62,6 +62,8 @@ interface SavedSearchesContextValue {
   addSearch: (search: SavedSearch) => Promise<void>
   updateSearch: (id: string, updates: Partial<SavedSearch>) => Promise<void>
   deleteSearch: (id: string) => Promise<void>
+  /** Pause every search except this one (for testing one query at a time). */
+  activateOnly: (id: string) => Promise<void>
   seedDefaults: () => Promise<void>
 }
 
@@ -216,6 +218,30 @@ export function SavedSearchesProvider({ children }: { children: ReactNode }) {
     [isCloudSync, user, searches]
   )
 
+  const activateOnly = useCallback(
+    async (id: string) => {
+      const now = new Date().toISOString()
+      const next = searches.map((s) => ({
+        ...s,
+        active: s.id === id,
+        updatedAt: now,
+      }))
+      if (!next.some((s) => s.id === id)) {
+        throw new Error('Saved search not found')
+      }
+
+      if (isCloudSync && supabase && user) {
+        const rows = next.map((s) => savedSearchToRow(s, user.id))
+        const { error } = await supabase.from('saved_searches').upsert(rows)
+        if (error) throw error
+      } else {
+        writeLocal(next)
+      }
+      setSearches(next)
+    },
+    [isCloudSync, user, searches]
+  )
+
   const seedDefaults = useCallback(async () => {
     for (const search of buildDefaultSearches()) {
       await addSearch(search)
@@ -223,8 +249,16 @@ export function SavedSearchesProvider({ children }: { children: ReactNode }) {
   }, [addSearch])
 
   const value = useMemo(
-    () => ({ searches, loading, addSearch, updateSearch, deleteSearch, seedDefaults }),
-    [searches, loading, addSearch, updateSearch, deleteSearch, seedDefaults]
+    () => ({
+      searches,
+      loading,
+      addSearch,
+      updateSearch,
+      deleteSearch,
+      activateOnly,
+      seedDefaults,
+    }),
+    [searches, loading, addSearch, updateSearch, deleteSearch, activateOnly, seedDefaults]
   )
 
   return (

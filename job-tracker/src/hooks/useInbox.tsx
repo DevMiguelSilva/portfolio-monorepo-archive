@@ -28,13 +28,22 @@ import { useSavedSearches } from './useSavedSearches'
 
 const LOCAL_KEY = 'applytrack-inbox'
 
+export interface RefreshInboxOptions {
+  /** Run only this saved search (ignores other active flags for this refresh). */
+  onlySearchId?: string
+  /** Park current "new" rows before fetching so results are only from this run. */
+  clearReviewFirst?: boolean
+}
+
 interface InboxContextValue {
   inbox: InboxJob[]
   loading: boolean
   refreshing: boolean
   refreshError: string | null
   newCount: number
-  refreshInbox: () => Promise<void>
+  refreshInbox: (options?: RefreshInboxOptions) => Promise<void>
+  /** Hide everything currently in the review list (keeps history for "Seen before"). */
+  clearReviewList: () => Promise<void>
   approveJob: (id: string) => Promise<string>
   dismissJob: (id: string) => Promise<void>
 }
@@ -142,24 +151,52 @@ export function InboxProvider({ children }: { children: ReactNode }) {
     [isCloudSync, user]
   )
 
-  const refreshInbox = useCallback(async () => {
+  const clearReviewList = useCallback(async () => {
+    const now = new Date().toISOString()
+    const next = inbox.map((item) =>
+      item.status === 'new' ? { ...item, status: 'dismissed' as const, updatedAt: now } : item
+    )
+    await persistAll(next)
+  }, [inbox, persistAll])
+
+  const refreshInbox = useCallback(async (options?: RefreshInboxOptions) => {
     setRefreshing(true)
     setRefreshError(null)
     try {
-      const active = searches.filter((s) => s.active && s.query.trim())
+      const active = options?.onlySearchId
+        ? searches
+            .filter((s) => s.id === options.onlySearchId && s.query.trim())
+            .map((s) => ({ ...s, active: true }))
+        : searches.filter((s) => s.active && s.query.trim())
+
       if (active.length === 0) {
-        throw new Error('Add at least one active saved search before refreshing.')
+        throw new Error(
+          options?.onlySearchId
+            ? 'That saved search was not found or has an empty query.'
+            : 'Add at least one active saved search before refreshing.'
+        )
       }
 
-      const existingByExternal = new Map(inbox.map((item) => [item.externalId, item]))
       const approvedExternal = new Set(
         jobs.filter((j) => j.externalId).map((j) => j.externalId)
       )
 
+      const nowPark = new Date().toISOString()
+      const startingInbox =
+        options?.clearReviewFirst
+          ? inbox.map((item) =>
+              item.status === 'new'
+                ? { ...item, status: 'dismissed' as const, updatedAt: nowPark }
+                : item
+            )
+          : inbox
+
+      const existingByExternal = new Map(startingInbox.map((item) => [item.externalId, item]))
+
       const merged = new Map<string, InboxJob>()
       // Keep full inbox history so seenCount / dismissed jobs survive when a listing
       // is missing from one refresh and returns later.
-      for (const item of inbox) {
+      for (const item of startingInbox) {
         merged.set(item.externalId, item)
       }
       const refreshStartedMs = Date.now()
@@ -412,10 +449,21 @@ export function InboxProvider({ children }: { children: ReactNode }) {
       refreshError,
       newCount,
       refreshInbox,
+      clearReviewList,
       approveJob,
       dismissJob,
     }),
-    [inbox, loading, refreshing, refreshError, newCount, refreshInbox, approveJob, dismissJob]
+    [
+      inbox,
+      loading,
+      refreshing,
+      refreshError,
+      newCount,
+      refreshInbox,
+      clearReviewList,
+      approveJob,
+      dismissJob,
+    ]
   )
 
   return <InboxContext.Provider value={value}>{children}</InboxContext.Provider>

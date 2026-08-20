@@ -26,11 +26,21 @@ const emptyDraft = {
 
 export function InboxPage() {
   const navigate = useNavigate()
-  const { inbox, loading, refreshing, refreshError, newCount, refreshInbox, approveJob, dismissJob } =
-    useInbox()
-  const { searches, addSearch, updateSearch, deleteSearch } = useSavedSearches()
-  const [showSearches, setShowSearches] = useState(false)
+  const {
+    inbox,
+    loading,
+    refreshing,
+    refreshError,
+    newCount,
+    refreshInbox,
+    clearReviewList,
+    approveJob,
+    dismissJob,
+  } = useInbox()
+  const { searches, addSearch, updateSearch, deleteSearch, activateOnly } = useSavedSearches()
+  const [showSearches, setShowSearches] = useState(true)
   const [actionId, setActionId] = useState<string | null>(null)
+  const [runningAloneId, setRunningAloneId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [draft, setDraft] = useState(emptyDraft)
   const [showAddSearch, setShowAddSearch] = useState(false)
@@ -59,12 +69,38 @@ export function InboxPage() {
     [newJobs]
   )
 
+  const activeSearches = useMemo(() => searches.filter((s) => s.active), [searches])
+
   const handleRefresh = async () => {
     setError(null)
     try {
       await refreshInbox()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Refresh failed')
+    }
+  }
+
+  const handleClearReview = async () => {
+    setError(null)
+    try {
+      await clearReviewList()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to clear review list')
+    }
+  }
+
+  /** Pause other searches, clear the review list, refresh only this query. */
+  const handleRunAlone = async (searchId: string) => {
+    setError(null)
+    setRunningAloneId(searchId)
+    try {
+      await activateOnly(searchId)
+      await refreshInbox({ onlySearchId: searchId, clearReviewFirst: true })
+      setShowSearches(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to run search')
+    } finally {
+      setRunningAloneId(null)
     }
   }
 
@@ -141,9 +177,10 @@ export function InboxPage() {
           </Link>
           <h1 className="mt-2 text-2xl font-bold">Job Inbox</h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
-            Refresh saved Canada searches (Adzuna), rank by Master CV track, then approve or dismiss.
-            Dismiss hides a role until the next refresh — if a search finds it again, it comes back
-            labeled Seen before so you can tell new hits from repeats.
+            Test searches one at a time with <span className="font-medium">Run alone</span> — that
+            pauses the others, clears the review list, and refreshes only that query. Use{' '}
+            <span className="font-medium">Seen before</span> to spot roles that already appeared from
+            an earlier search. Approve keeps jobs off future inbox results.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -156,11 +193,19 @@ export function InboxPage() {
           </button>
           <button
             type="button"
+            onClick={handleClearReview}
+            disabled={refreshing || newCount === 0}
+            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium dark:border-track-700 disabled:opacity-50"
+          >
+            Clear review list
+          </button>
+          <button
+            type="button"
             onClick={handleRefresh}
-            disabled={refreshing}
+            disabled={refreshing || Boolean(runningAloneId)}
             className="rounded-lg bg-track-accent px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600 disabled:opacity-50"
           >
-            {refreshing ? 'Refreshing…' : 'Refresh inbox'}
+            {refreshing && !runningAloneId ? 'Refreshing…' : 'Refresh active'}
           </button>
         </div>
       </div>
@@ -171,7 +216,7 @@ export function InboxPage() {
           <span className="text-slate-500 dark:text-slate-400">
             {' '}
             · <span className="font-medium text-emerald-600 dark:text-emerald-400">{firstSeenCount}</span>{' '}
-            first time
+            new
             {seenBeforeCount > 0 && (
               <>
                 {' '}
@@ -182,6 +227,13 @@ export function InboxPage() {
             )}
           </span>
         )}
+        <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+          {activeSearches.length === 0
+            ? 'No active searches — use Run alone or Activate on a saved search.'
+            : activeSearches.length === 1
+              ? `Active search: ${activeSearches[0].label.trim() || activeSearches[0].query}`
+              : `${activeSearches.length} searches active (pause extras or use Run alone to isolate one).`}
+        </span>
       </div>
 
       {(error || refreshError) && (
@@ -192,12 +244,22 @@ export function InboxPage() {
 
       {showSearches && (
         <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 dark:border-track-700 dark:bg-track-800">
-          <h2 className="font-semibold">Saved searches</h2>
+          <div>
+            <h2 className="font-semibold">Saved searches</h2>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              Tip: use <span className="font-medium">Run alone</span> to judge one query’s results
+              without mixing other searches.
+            </p>
+          </div>
           <ul className="space-y-3">
             {searches.map((search) => (
               <li
                 key={search.id}
-                className="rounded-lg border border-slate-200 p-3 text-sm dark:border-track-700"
+                className={`rounded-lg border p-3 text-sm dark:border-track-700 ${
+                  search.active
+                    ? 'border-track-accent/40 bg-track-accent/5 dark:bg-track-accent/10'
+                    : 'border-slate-200'
+                }`}
               >
                 {editingId === search.id ? (
                   <div className="space-y-2.5">
@@ -224,8 +286,10 @@ export function InboxPage() {
                     <div>
                       <p className="font-medium">
                         {search.label.trim() || search.query}
-                        {!search.active && (
-                          <span className="ml-2 text-xs text-slate-400">(paused)</span>
+                        {search.active ? (
+                          <span className="ml-2 text-xs font-semibold text-track-accent">active</span>
+                        ) : (
+                          <span className="ml-2 text-xs text-slate-400">paused</span>
                         )}
                       </p>
                       <p className="text-xs text-slate-500">
@@ -242,6 +306,14 @@ export function InboxPage() {
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={refreshing || Boolean(runningAloneId)}
+                        onClick={() => handleRunAlone(search.id)}
+                        className="rounded-md bg-track-accent px-2 py-1 text-xs font-semibold text-white hover:bg-indigo-600 disabled:opacity-50"
+                      >
+                        {runningAloneId === search.id ? 'Running…' : 'Run alone'}
+                      </button>
                       <button
                         type="button"
                         onClick={() => startEdit(search)}
@@ -316,9 +388,9 @@ export function InboxPage() {
         <div className="rounded-xl border border-dashed border-slate-300 p-12 text-center dark:border-track-700">
           <h3 className="font-semibold">Inbox is empty</h3>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Click Refresh inbox to pull roles from your saved searches. If refresh finds only jobs
-            you already approved, or Adzuna returns nothing, the list stays empty — check the
-            message above after refreshing.
+            Open Saved searches and click <span className="font-medium">Run alone</span> on one
+            query, or Activate searches and use Refresh active. Check the message above if a run
+            returns nothing new.
           </p>
         </div>
       ) : (
@@ -347,9 +419,9 @@ export function InboxPage() {
                     {(job.seenCount ?? 1) > 1 ? (
                       <span
                         className="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 ring-1 ring-inset ring-amber-300/80 dark:bg-amber-950/50 dark:text-amber-300 dark:ring-amber-700"
-                        title={`This listing matched again (seen ${job.seenCount} refreshes). Useful to compare which searches keep surfacing it.`}
+                        title="This listing already appeared from a previous inbox search."
                       >
-                        Seen before · ×{job.seenCount}
+                        Seen before
                       </span>
                     ) : (
                       <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-inset ring-emerald-300/80 dark:bg-emerald-950/50 dark:text-emerald-300 dark:ring-emerald-700">
