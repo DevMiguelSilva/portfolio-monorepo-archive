@@ -3,7 +3,9 @@ import { applyCountToLevel } from '../lib/applyStreak'
 import {
   buildHeatmapCells,
   buildHeatmapCellsFromLevel,
+  buildYearHeatmapCellsFromLevel,
   dayHeatLevel,
+  type HeatCell,
   type HeatLevel,
 } from '../lib/huntStreak'
 import type { HuntDay } from '../types/portal'
@@ -17,34 +19,42 @@ const LEVEL_CLASS: Record<HeatLevel, string> = {
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-type HeatCell = { date: string; level: HeatLevel; weekIndex: number; weekday: number }
-
 interface PortalHeatmapProps {
   variant: 'portal'
   daysByDate: Map<string, HuntDay>
   activeFeedIds: string[]
+  /** Default: full calendar year through today. */
+  mode?: 'year' | 'rolling'
   weeks?: number
 }
 
 interface ApplyHeatmapProps {
   variant: 'apply'
   countsByDate: Map<string, number>
+  mode?: 'year' | 'rolling'
   weeks?: number
 }
 
 type ActivityHeatmapProps = PortalHeatmapProps | ApplyHeatmapProps
 
 export function ActivityHeatmap(props: ActivityHeatmapProps) {
+  const mode = props.mode ?? 'year'
   const weeks = props.weeks ?? 26
+  const year = new Date().getFullYear()
 
   const cells = useMemo(() => {
     if (props.variant === 'portal') {
+      if (mode === 'year') {
+        return buildYearHeatmapCellsFromLevel((date) =>
+          dayHeatLevel(props.daysByDate.get(date), props.activeFeedIds)
+        )
+      }
       return buildHeatmapCells(weeks, props.daysByDate, props.activeFeedIds)
     }
-    return buildHeatmapCellsFromLevel(weeks, (date) =>
-      applyCountToLevel(props.countsByDate.get(date) ?? 0)
-    )
-  }, [props, weeks])
+    const levelFor = (date: string) => applyCountToLevel(props.countsByDate.get(date) ?? 0)
+    if (mode === 'year') return buildYearHeatmapCellsFromLevel(levelFor)
+    return buildHeatmapCellsFromLevel(weeks, levelFor)
+  }, [props, mode, weeks])
 
   const legend =
     props.variant === 'portal'
@@ -52,6 +62,7 @@ export function ActivityHeatmap(props: ActivityHeatmapProps) {
       : '1 apply · 2 applies · 3+ applies'
 
   const titleFor = (cell: HeatCell) => {
+    if (cell.isFuture) return `${cell.date}: Upcoming`
     if (props.variant === 'portal') {
       const level = dayHeatLevel(props.daysByDate.get(cell.date), props.activeFeedIds)
       return `${cell.date}: ${
@@ -78,6 +89,9 @@ export function ActivityHeatmap(props: ActivityHeatmapProps) {
 
   return (
     <div className="space-y-3">
+      {mode === 'year' && (
+        <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{year}</p>
+      )}
       <div className="flex gap-2 overflow-x-auto pb-1">
         <div className="flex flex-col justify-between py-1 text-[10px] text-slate-400">
           {WEEKDAYS.map((d, i) => (
@@ -93,7 +107,11 @@ export function ActivityHeatmap(props: ActivityHeatmapProps) {
                 <div
                   key={cell.date}
                   title={titleFor(cell)}
-                  className={`h-3 w-3 rounded-sm ${LEVEL_CLASS[cell.level]}`}
+                  className={`h-3 w-3 rounded-sm ${
+                    cell.isFuture
+                      ? 'border border-dashed border-slate-200 bg-transparent dark:border-track-700'
+                      : LEVEL_CLASS[cell.level]
+                  }`}
                 />
               ))}
             </div>

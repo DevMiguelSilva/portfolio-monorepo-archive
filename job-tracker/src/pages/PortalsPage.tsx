@@ -106,10 +106,9 @@ export function PortalsPage() {
           <Link to="/" className="text-sm text-slate-500 hover:text-track-accent dark:text-slate-400">
             ← Back to board
           </Link>
-          <h1 className="mt-2 text-2xl font-bold">Portal feeds</h1>
+          <h1 className="mt-2 text-2xl font-bold">Portals</h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
-            Save your usual Indeed / ZipRecruiter filtered links. Open them daily, check them off,
-            and keep a streak — like a job-hunt habit tracker.
+            Save links to the job boards you check regularly, then tick them off as you go.
           </p>
         </div>
         <button
@@ -166,11 +165,21 @@ export function PortalsPage() {
       )}
 
       <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-track-700 dark:bg-track-800">
-        <h2 className="mb-1 font-semibold">Activity</h2>
-        <p className="mb-4 text-xs text-slate-500">
-          Green cubes = days you checked your portals (GitHub / Duolingo style). Bright = all active
-          feeds done that day.
-        </p>
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+          <h2 className="font-semibold">Portal streak</h2>
+          <div className="flex flex-wrap gap-4 text-sm">
+            <div>
+              <p className="text-xs text-slate-400">Streak</p>
+              <p className="font-bold text-track-accent">
+                {streak} day{streak === 1 ? '' : 's'}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-400">{new Date().getFullYear()}</p>
+              <p className="font-bold">{yearComplete} complete days</p>
+            </div>
+          </div>
+        </div>
         {activeIds.length === 0 ? (
           <p className="text-sm text-slate-500">Add at least one active feed to start a streak.</p>
         ) : (
@@ -178,7 +187,7 @@ export function PortalsPage() {
             variant="portal"
             daysByDate={daysByDate}
             activeFeedIds={activeIds}
-            weeks={26}
+            mode="year"
           />
         )}
       </section>
@@ -187,7 +196,7 @@ export function PortalsPage() {
         <h2 className="font-semibold">Your feeds</h2>
         {feeds.length === 0 ? (
           <p className="text-sm text-slate-500">
-            No feeds yet. Use “+ Add portal URL” to paste a filtered Indeed or ZipRecruiter link.
+            No feeds yet. Add a link from Indeed, ZipRecruiter, or another board you use.
           </p>
         ) : (
           <ul className="space-y-3">

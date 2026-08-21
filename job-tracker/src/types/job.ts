@@ -29,6 +29,8 @@ export interface JobApplication {
    * True after manual paste of the full posting (Add Job or Job Detail enrich).
    */
   jdComplete: boolean
+  /** Soft-delete timestamp — set when moved to Trash; null when active on the board. */
+  deletedAt: string | null
   createdAt: string
   updatedAt: string
 }
@@ -153,6 +155,7 @@ export function createEmptyJob(overrides: Partial<JobApplication> = {}): JobAppl
     matchScore: null,
     cvTrack: null,
     jdComplete: true,
+    deletedAt: null,
     createdAt: now,
     updatedAt: now,
     ...overrides,

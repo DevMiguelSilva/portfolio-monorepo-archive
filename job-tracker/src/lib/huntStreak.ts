@@ -53,8 +53,17 @@ export function buildHeatmapCells(
   daysByDate: Map<string, HuntDay>,
   activeFeedIds: string[],
   today = new Date()
-): { date: string; level: HeatLevel; weekIndex: number; weekday: number }[] {
+): HeatCell[] {
   return buildHeatmapCellsFromLevel(weeks, (date) => dayHeatLevel(daysByDate.get(date), activeFeedIds), today)
+}
+
+export type HeatCell = {
+  date: string
+  level: HeatLevel
+  weekIndex: number
+  weekday: number
+  /** True for days after today (current week padding) — render as empty outline, not “missed”. */
+  isFuture: boolean
 }
 
 /** Shared calendar grid builder — last `weeks` weeks ending on the week that contains today. */
@@ -62,7 +71,7 @@ export function buildHeatmapCellsFromLevel(
   weeks: number,
   levelForDate: (date: string) => HeatLevel,
   today = new Date()
-): { date: string; level: HeatLevel; weekIndex: number; weekday: number }[] {
+): HeatCell[] {
   const end = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12, 0, 0, 0)
 
   // Sunday of the week that contains today
@@ -73,21 +82,55 @@ export function buildHeatmapCellsFromLevel(
   const start = new Date(thisSunday)
   start.setDate(start.getDate() - (weeks - 1) * 7)
 
-  const cells: { date: string; level: HeatLevel; weekIndex: number; weekday: number }[] = []
-  const cursor = new Date(start)
+  return buildHeatmapRange(start, thisSunday, end, levelForDate)
+}
 
-  for (let weekIndex = 0; weekIndex < weeks; weekIndex++) {
+/**
+ * Full calendar year through the week that contains today (auto-updates each year).
+ * Starts on the Sunday of the week that contains Jan 1.
+ */
+export function buildYearHeatmapCellsFromLevel(
+  levelForDate: (date: string) => HeatLevel,
+  today = new Date()
+): HeatCell[] {
+  const end = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12, 0, 0, 0)
+  const jan1 = new Date(today.getFullYear(), 0, 1, 12, 0, 0, 0)
+  const start = new Date(jan1)
+  start.setDate(jan1.getDate() - jan1.getDay())
+
+  const thisSunday = new Date(end)
+  thisSunday.setDate(thisSunday.getDate() - thisSunday.getDay())
+
+  return buildHeatmapRange(start, thisSunday, end, levelForDate)
+}
+
+function buildHeatmapRange(
+  startSunday: Date,
+  endSunday: Date,
+  todayNoon: Date,
+  levelForDate: (date: string) => HeatLevel
+): HeatCell[] {
+  const cells: HeatCell[] = []
+  let weekIndex = 0
+
+  while (weekIndex <= 60) {
+    const weekStart = new Date(startSunday)
+    weekStart.setDate(startSunday.getDate() + weekIndex * 7)
+    if (weekStart.getTime() > endSunday.getTime()) break
+
     for (let weekday = 0; weekday < 7; weekday++) {
-      const date = localDateKey(cursor)
-      const future = cursor.getTime() > end.getTime()
+      const cellDate = new Date(weekStart)
+      cellDate.setDate(weekStart.getDate() + weekday)
+      const isFuture = cellDate.getTime() > todayNoon.getTime()
       cells.push({
-        date,
-        level: future ? 0 : levelForDate(date),
+        date: localDateKey(cellDate),
+        level: isFuture ? 0 : levelForDate(localDateKey(cellDate)),
         weekIndex,
         weekday,
+        isFuture,
       })
-      cursor.setDate(cursor.getDate() + 1)
     }
+    weekIndex += 1
   }
 
   return cells

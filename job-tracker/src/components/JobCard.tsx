@@ -9,17 +9,32 @@ interface JobCardProps {
   isDragging?: boolean
   onDragStart?: (id: string, event: DragEvent<HTMLElement>) => void
   onDragEnd?: () => void
+  /** Trash column: no drag; show restore / purge actions. */
+  trashMode?: boolean
+  onRestore?: (id: string) => void
+  onPurge?: (id: string) => void
 }
 
-export function JobCard({ job, isDragging, onDragStart, onDragEnd }: JobCardProps) {
+export function JobCard({
+  job,
+  isDragging,
+  onDragStart,
+  onDragEnd,
+  trashMode,
+  onRestore,
+  onPurge,
+}: JobCardProps) {
   return (
     <article
-      draggable
-      onDragStart={(e) => onDragStart?.(job.id, e)}
+      draggable={!trashMode}
+      onDragStart={(e) => {
+        if (trashMode) return
+        onDragStart?.(job.id, e)
+      }}
       onDragEnd={() => onDragEnd?.()}
-      className={`cursor-grab rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition hover:shadow-md active:cursor-grabbing dark:border-track-700 dark:bg-track-800 ${
-        isDragging ? 'opacity-40' : ''
-      }`}
+      className={`rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition hover:shadow-md dark:border-track-700 dark:bg-track-800 ${
+        trashMode ? '' : 'cursor-grab active:cursor-grabbing'
+      } ${isDragging ? 'opacity-40' : ''}`}
     >
       <Link to={`/job/${job.id}`} draggable={false} className="block space-y-2">
         <div>
@@ -54,6 +69,28 @@ export function JobCard({ job, isDragging, onDragStart, onDragEnd }: JobCardProp
           )}
         </div>
       </Link>
+      {trashMode && (
+        <div className="mt-2 flex flex-wrap gap-2 border-t border-slate-100 pt-2 dark:border-track-700">
+          <button
+            type="button"
+            onClick={() => onRestore?.(job.id)}
+            className="text-xs font-medium text-track-accent hover:underline"
+          >
+            Restore
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (confirm(`Permanently delete ${job.role} at ${job.company}?`)) {
+                onPurge?.(job.id)
+              }
+            }}
+            className="text-xs font-medium text-red-500 hover:underline"
+          >
+            Delete forever
+          </button>
+        </div>
+      )}
     </article>
   )
 }

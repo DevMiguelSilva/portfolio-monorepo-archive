@@ -29,6 +29,7 @@ create table if not exists job_applications (
   external_id text not null default '',
   match_score integer,
   jd_complete boolean not null default true,
+  deleted_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -45,6 +46,7 @@ where jd_complete is null;
 alter table job_applications alter column jd_complete set default true;
 update job_applications set jd_complete = true where jd_complete is null;
 alter table job_applications alter column jd_complete set not null;
+alter table job_applications add column if not exists deleted_at timestamptz;
 
 create table if not exists saved_searches (
   id uuid primary key default gen_random_uuid(),

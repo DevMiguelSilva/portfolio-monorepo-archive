@@ -12,14 +12,16 @@ import { STATUS_CONFIG, STATUS_ORDER } from '../types/job'
 import { useJobs } from '../hooks/useJobs'
 
 export function DashboardPage() {
-  const { jobs, moveJob, loading } = useJobs()
+  const { jobs, activeJobs, trashedJobs, moveJob, restoreJob, purgeJob, loading } = useJobs()
   const [showRejected, setShowRejected] = useState(false)
+  const [showTrash, setShowTrash] = useState(false)
 
   const stats = STATUS_ORDER.map((status) => ({
     status,
-    count: jobs.filter((j) => j.status === status).length,
+    count: activeJobs.filter((j) => j.status === status).length,
   }))
 
+  // Include trashed applies so history on the yearly streak stays intact
   const applyCounts = useMemo(() => buildApplyCountsByDate(jobs), [jobs])
   const applyStreak = useMemo(() => computeApplyStreak(applyCounts), [applyCounts])
   const appliedToday = useMemo(() => applicationsToday(applyCounts), [applyCounts])
@@ -31,23 +33,16 @@ export function DashboardPage() {
   return (
     <div className="space-y-8">
       <section className="rounded-2xl bg-gradient-to-br from-indigo-600 via-track-accent to-indigo-800 px-6 py-10 text-white sm:px-10">
-        <p className="mb-1 text-sm uppercase tracking-widest text-indigo-200">ApplyTrack v2</p>
+        <p className="mb-1 text-sm uppercase tracking-widest text-indigo-200">ApplyTrack</p>
         <h1 className="text-3xl font-bold sm:text-4xl">Find · Tailor · Track</h1>
         <p className="mt-2 max-w-xl text-indigo-100">
-          Your application board and apply streak. Use Portals for daily URL check-ins, Inbox for
-          Adzuna triage, and CVs to tailor resumes.
+          Track applications, check portals, and tailor resumes — without the busywork.
         </p>
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-track-700 dark:bg-track-800">
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h2 className="font-semibold">Apply streak</h2>
-            <p className="text-xs text-slate-500">
-              Days you sent applications (from Applied date on each job). Separate from Portals
-              check-ins.
-            </p>
-          </div>
+          <h2 className="font-semibold">Application streak</h2>
           <div className="flex flex-wrap gap-4 text-sm">
             <div>
               <p className="text-xs text-slate-400">Streak</p>
@@ -67,10 +62,10 @@ export function DashboardPage() {
             </div>
           </div>
         </div>
-        <ActivityHeatmap variant="apply" countsByDate={applyCounts} weeks={26} />
+        <ActivityHeatmap variant="apply" countsByDate={applyCounts} mode="year" />
       </section>
 
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {stats.map(({ status, count }) => {
           const isRejected = status === 'rejected'
           const active = isRejected && showRejected
@@ -112,13 +107,33 @@ export function DashboardPage() {
             </div>
           )
         })}
+
+        <button
+          type="button"
+          onClick={() => setShowTrash((v) => !v)}
+          className={`rounded-xl border p-4 text-center transition ${
+            showTrash
+              ? 'border-slate-400 bg-slate-100 ring-2 ring-slate-300 dark:border-track-500 dark:bg-track-900 dark:ring-track-600'
+              : 'border-slate-200 bg-white hover:border-slate-400 dark:border-track-700 dark:bg-track-800 dark:hover:border-track-500'
+          }`}
+          aria-pressed={showTrash}
+          title={showTrash ? 'Hide Trash column' : 'Show Trash column on the board'}
+        >
+          <p className="text-2xl font-bold text-track-accent">{trashedJobs.length}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Trash
+            <span className="mt-0.5 block text-[10px] font-normal normal-case text-slate-400">
+              {showTrash ? 'Click to hide column' : 'Click to show on board'}
+            </span>
+          </p>
+        </button>
       </section>
 
       <section>
         <h2 className="mb-4 text-xl font-bold">Application Board</h2>
         {loading ? (
           <p className="text-sm text-slate-500">Loading applications…</p>
-        ) : jobs.length === 0 ? (
+        ) : activeJobs.length === 0 && trashedJobs.length === 0 ? (
           <div className="rounded-xl border border-dashed border-slate-300 p-12 text-center dark:border-track-700">
             <p className="text-4xl">📋</p>
             <h3 className="mt-3 font-semibold">No applications yet</h3>
@@ -134,10 +149,15 @@ export function DashboardPage() {
           </div>
         ) : (
           <KanbanBoard
-            jobs={jobs}
+            jobs={activeJobs}
             onMoveJob={moveJob}
             showRejected={showRejected}
             onHideRejected={() => setShowRejected(false)}
+            showTrash={showTrash}
+            trashedJobs={trashedJobs}
+            onHideTrash={() => setShowTrash(false)}
+            onRestoreJob={restoreJob}
+            onPurgeJob={purgeJob}
           />
         )}
       </section>

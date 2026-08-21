@@ -26,7 +26,7 @@ import {
 export function JobDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { getJob, deleteJob, updateJob } = useJobs()
+  const { getJob, deleteJob, restoreJob, purgeJob, updateJob } = useJobs()
   const { getCv, activeTrack, library } = useMasterCv()
   const job = id ? getJob(id) : undefined
   const [showFullJd, setShowFullJd] = useState(false)
@@ -60,8 +60,19 @@ export function JobDetailPage() {
   }
 
   const handleDelete = async () => {
-    if (confirm(`Delete ${job.role} at ${job.company}?`)) {
+    if (confirm(`Move ${job.role} at ${job.company} to Trash?`)) {
       await deleteJob(job.id)
+      navigate('/')
+    }
+  }
+
+  const handleRestore = async () => {
+    await restoreJob(job.id)
+  }
+
+  const handlePurge = async () => {
+    if (confirm(`Permanently delete ${job.role} at ${job.company}? This cannot be undone.`)) {
+      await purgeJob(job.id)
       navigate('/')
     }
   }
@@ -211,13 +222,37 @@ export function JobDetailPage() {
           )}
         </div>
 
-        <button
-          type="button"
-          onClick={handleDelete}
-          className="rounded-lg border border-red-300 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950/30"
-        >
-          Delete
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {job.deletedAt ? (
+            <>
+              <span className="self-center rounded-md bg-slate-200 px-2 py-1 text-xs font-medium text-slate-700 dark:bg-track-700 dark:text-slate-200">
+                In Trash
+              </span>
+              <button
+                type="button"
+                onClick={handleRestore}
+                className="rounded-lg bg-track-accent px-3 py-2 text-sm font-medium text-white hover:bg-indigo-600"
+              >
+                Restore
+              </button>
+              <button
+                type="button"
+                onClick={handlePurge}
+                className="rounded-lg border border-red-300 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950/30"
+              >
+                Delete forever
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={handleDelete}
+              className="rounded-lg border border-red-300 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950/30"
+            >
+              Move to Trash
+            </button>
+          )}
+        </div>
       </div>
 
       <section className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 sm:grid-cols-2 dark:border-track-700 dark:bg-track-800">

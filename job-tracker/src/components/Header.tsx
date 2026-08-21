@@ -2,7 +2,6 @@ import { Link, NavLink } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useInbox } from '../hooks/useInbox'
 import { useJobs } from '../hooks/useJobs'
-import { usePortalFeeds } from '../hooks/usePortalFeeds'
 import { useTheme } from '../hooks/useTheme'
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -17,8 +16,6 @@ export function Header() {
   const { signOut, isCloudEnabled, user } = useAuth()
   const { isCloudSync } = useJobs()
   const { newCount } = useInbox()
-  const { todayComplete, activeFeeds, checkedTodayCount } = usePortalFeeds()
-
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-track-800 dark:bg-track-950/90">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
@@ -38,14 +35,6 @@ export function Header() {
           </NavLink>
           <NavLink to="/portals" className={navLinkClass}>
             Portals
-            {activeFeeds.length > 0 && !todayComplete && (
-              <span className="ml-1 rounded-full bg-amber-500/90 px-1.5 text-xs text-white">
-                {checkedTodayCount}/{activeFeeds.length}
-              </span>
-            )}
-            {activeFeeds.length > 0 && todayComplete && (
-              <span className="ml-1 text-xs text-emerald-300">✓</span>
-            )}
           </NavLink>
           <NavLink to="/inbox" className={navLinkClass}>
             Inbox

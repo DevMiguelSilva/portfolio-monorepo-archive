@@ -17,11 +17,20 @@ const LOCAL_STORAGE_KEY = 'job-tracker-applications'
 const MIGRATED_KEY = 'job-tracker-migrated'
 
 interface JobsContextValue {
+  /** All jobs including trash (for streaks / inbox external-id blocking). */
   jobs: JobApplication[]
+  /** Active board jobs (not in trash). */
+  activeJobs: JobApplication[]
+  /** Soft-deleted jobs. */
+  trashedJobs: JobApplication[]
   loading: boolean
   addJob: (job: JobApplication) => Promise<void>
   updateJob: (id: string, updates: Partial<JobApplication>) => Promise<void>
+  /** Soft-delete → Trash (recoverable). */
   deleteJob: (id: string) => Promise<void>
+  restoreJob: (id: string) => Promise<void>
+  /** Permanently remove from trash. */
+  purgeJob: (id: string) => Promise<void>
   moveJob: (id: string, status: JobStatus) => Promise<void>
   getJob: (id: string) => JobApplication | undefined
   isCloudSync: boolean
@@ -48,6 +57,7 @@ function normalizeJob(job: JobApplication): JobApplication {
       jdComplete: job.jdComplete,
       source: job.source ?? 'manual',
     }),
+    deletedAt: job.deletedAt ?? null,
   }
 }
 
@@ -121,7 +131,7 @@ export function JobsProvider({ children }: { children: ReactNode }) {
 
   const addJob = useCallback(
     async (job: JobApplication) => {
-      const normalized = normalizeJob(job)
+      const normalized = normalizeJob({ ...job, deletedAt: null })
       if (isCloudSync && supabase && user) {
         const row = { ...jobToRow(normalized, user.id), updated_at: new Date().toISOString() }
         const { error } = await supabase.from('job_applications').insert(row)
@@ -157,6 +167,20 @@ export function JobsProvider({ children }: { children: ReactNode }) {
 
   const deleteJob = useCallback(
     async (id: string) => {
+      await updateJob(id, { deletedAt: new Date().toISOString() })
+    },
+    [updateJob]
+  )
+
+  const restoreJob = useCallback(
+    async (id: string) => {
+      await updateJob(id, { deletedAt: null })
+    },
+    [updateJob]
+  )
+
+  const purgeJob = useCallback(
+    async (id: string) => {
       if (isCloudSync && supabase) {
         const { error } = await supabase.from('job_applications').delete().eq('id', id)
         if (error) throw error
@@ -172,7 +196,7 @@ export function JobsProvider({ children }: { children: ReactNode }) {
   const moveJob = useCallback(
     async (id: string, status: JobStatus) => {
       const job = jobs.find((j) => j.id === id)
-      if (!job) return
+      if (!job || job.deletedAt) return
       // Saved = not an application for streak. Applied/interview/offer/rejected keep or set date.
       const countsAsApply = status !== 'saved'
       const today = new Date().toISOString().slice(0, 10)
@@ -186,9 +210,38 @@ export function JobsProvider({ children }: { children: ReactNode }) {
 
   const getJob = useCallback((id: string) => jobs.find((job) => job.id === id), [jobs])
 
+  const activeJobs = useMemo(() => jobs.filter((j) => !j.deletedAt), [jobs])
+  const trashedJobs = useMemo(() => jobs.filter((j) => Boolean(j.deletedAt)), [jobs])
+
   const value = useMemo(
-    () => ({ jobs, loading, addJob, updateJob, deleteJob, moveJob, getJob, isCloudSync }),
-    [jobs, loading, addJob, updateJob, deleteJob, moveJob, getJob, isCloudSync]
+    () => ({
+      jobs,
+      activeJobs,
+      trashedJobs,
+      loading,
+      addJob,
+      updateJob,
+      deleteJob,
+      restoreJob,
+      purgeJob,
+      moveJob,
+      getJob,
+      isCloudSync,
+    }),
+    [
+      jobs,
+      activeJobs,
+      trashedJobs,
+      loading,
+      addJob,
+      updateJob,
+      deleteJob,
+      restoreJob,
+      purgeJob,
+      moveJob,
+      getJob,
+      isCloudSync,
+    ]
   )
 
   return <JobsContext.Provider value={value}>{children}</JobsContext.Provider>

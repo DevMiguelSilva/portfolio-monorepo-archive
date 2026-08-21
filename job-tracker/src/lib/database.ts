@@ -23,6 +23,7 @@ export interface JobRow {
   match_score?: number | null
   cv_track?: string | null
   jd_complete?: boolean | null
+  deleted_at?: string | null
   created_at: string
   updated_at: string
 }
@@ -126,6 +127,7 @@ export function rowToJob(row: JobRow): JobApplication {
       jdComplete: row.jd_complete ?? undefined,
       source: row.source ?? 'manual',
     }),
+    deletedAt: row.deleted_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -152,6 +154,7 @@ export function jobToRow(job: JobApplication, userId: string): Omit<JobRow, 'cre
     match_score: job.matchScore,
     cv_track: job.cvTrack,
     jd_complete: job.jdComplete,
+    deleted_at: job.deletedAt,
   }
 }
 
