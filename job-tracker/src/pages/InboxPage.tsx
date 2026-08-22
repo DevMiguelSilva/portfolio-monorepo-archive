@@ -39,7 +39,7 @@ export function InboxPage() {
     dismissJob,
   } = useInbox()
   const { searches, addSearch, updateSearch, deleteSearch, activateOnly } = useSavedSearches()
-  const [showSearches, setShowSearches] = useState(true)
+  const [showSearches, setShowSearches] = useState(false)
   const [actionId, setActionId] = useState<string | null>(null)
   const [runningAloneId, setRunningAloneId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
