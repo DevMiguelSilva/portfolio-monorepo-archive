@@ -10,8 +10,14 @@ export const formLabelClass = 'text-xs font-medium text-slate-500'
 export const formControlClass =
   'mt-0.5 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-track-accent focus:ring-2 focus:ring-track-accent/20 dark:border-track-700 dark:bg-track-900'
 
+/** Select control — chevron inset defined in index.css (.form-select). */
+export const formSelectClass = `${formControlClass} form-select`
+
 export const formPrimaryBtnClass =
   'rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-medium text-white dark:bg-slate-100 dark:text-slate-900'
 
 export const formAccentBtnClass =
   'rounded-lg bg-track-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-600'
+
+/** Short page intros — wide enough to read as a full line on most screens. */
+export const pageBlurbClass = 'mt-1 max-w-4xl text-sm text-slate-500 dark:text-slate-400'

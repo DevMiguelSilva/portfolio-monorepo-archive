@@ -9,6 +9,8 @@ import {
   formControlClass,
   formGridClass,
   formLabelClass,
+  formSelectClass,
+  pageBlurbClass,
 } from '../lib/formUi'
 import { scoreMasterCvAgainstJob } from '../lib/matchScore'
 import { CV_TRACK_LABELS, CV_TRACKS, type CvTrack } from '../types/cv'
@@ -16,23 +18,24 @@ import {
   createEmptyJob,
   guessJobSourceFromUrl,
   JOB_SOURCE_LABELS,
-  MANUAL_JOB_SOURCE_OPTIONS,
-  STATUS_ORDER,
-  type JobStatus,
+  PORTAL_JOB_SOURCE_OPTIONS,
+  type PortalJobSource,
 } from '../types/job'
 
 export function AddJobPage() {
   const navigate = useNavigate()
   const { addJob } = useJobs()
   const { getCv, activeTrack } = useMasterCv()
-  const [form, setForm] = useState(() => createEmptyJob({ cvTrack: activeTrack }))
+  const [form, setForm] = useState(() =>
+    createEmptyJob({ cvTrack: activeTrack, source: 'indeed', status: 'saved' })
+  )
   const [pasteText, setPasteText] = useState('')
   const [parsing, setParsing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   /** Once the user picks Source manually, stop overwriting from URL. */
   const [sourceLocked, setSourceLocked] = useState(false)
 
-  const update = (field: keyof typeof form, value: string | JobStatus | CvTrack | null) => {
+  const update = (field: keyof typeof form, value: string | CvTrack | null) => {
     setForm((prev) => ({ ...prev, [field]: value }))
   }
 
@@ -85,6 +88,7 @@ export function AddJobPage() {
       )
       await addJob({
         ...form,
+        status: 'saved',
         jobDescription: fullJd,
         cvTrack: track,
         matchScore: match.score,
@@ -96,6 +100,12 @@ export function AddJobPage() {
     }
   }
 
+  const sourceValue: PortalJobSource = PORTAL_JOB_SOURCE_OPTIONS.includes(
+    form.source as PortalJobSource
+  )
+    ? (form.source as PortalJobSource)
+    : 'indeed'
+
   return (
     <div className="mx-auto max-w-2xl space-y-8">
       <div>
@@ -103,17 +113,17 @@ export function AddJobPage() {
           ← Back to board
         </Link>
         <h1 className="mt-2 text-2xl font-bold">Add Application</h1>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          Paste the full job offer. We store the original JD so you can revisit it for interviews;
-          AI only fills company, location, salary, a short summary, and skills.
+        <p className={pageBlurbClass}>
+          Paste a posting to extract fields, or fill them in yourself. New applications land in
+          Saved.
         </p>
       </div>
 
       <div className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-5 dark:border-indigo-900 dark:bg-indigo-950/20">
         <h2 className="mb-2 font-semibold">Quick add with AI</h2>
         <p className="mb-3 text-sm text-slate-500 dark:text-slate-400">
-          Paste the complete posting (company, location, salary, responsibilities). AI extracts
-          fields; the full text is saved unchanged.
+          Paste the full posting. AI fills company, role, location, salary, and skills; the original
+          text is kept for interview prep.
         </p>
         <textarea
           value={pasteText}
@@ -194,38 +204,30 @@ export function AddJobPage() {
               type="url"
               value={form.jobUrl}
               onChange={(e) => setJobUrl(e.target.value)}
-              placeholder="https://indeed.com/… or LinkedIn / ZipRecruiter link"
+              placeholder="https://indeed.com/… or LinkedIn / ZipRecruiter"
               className={formControlClass}
             />
             <p className="mt-0.5 text-xs text-slate-400">
-              Used to auto-detect source (Indeed, LinkedIn, ZipRecruiter…).
+              Auto-detects portal (Indeed, LinkedIn, ZipRecruiter).
             </p>
           </label>
           <label className="block">
-            <span className={formLabelClass}>Source</span>
+            <span className={formLabelClass}>Portal</span>
             <select
-              value={
-                MANUAL_JOB_SOURCE_OPTIONS.includes(
-                  form.source as (typeof MANUAL_JOB_SOURCE_OPTIONS)[number]
-                )
-                  ? form.source
-                  : 'other'
-              }
+              value={sourceValue}
               onChange={(e) => {
                 setSourceLocked(true)
                 update('source', e.target.value)
               }}
-              className={formControlClass}
+              className={formSelectClass}
             >
-              {MANUAL_JOB_SOURCE_OPTIONS.map((value) => (
+              {PORTAL_JOB_SOURCE_OPTIONS.map((value) => (
                 <option key={value} value={value}>
                   {JOB_SOURCE_LABELS[value]}
                 </option>
               ))}
             </select>
-            <p className="mt-0.5 text-xs text-slate-400">
-              Where you found this posting — shown on the board for tracking.
-            </p>
+            <p className="mt-0.5 text-xs text-slate-400">Where the posting was listed.</p>
           </label>
           <label className="block">
             <span className={formLabelClass}>
@@ -234,7 +236,7 @@ export function AddJobPage() {
             <select
               value={form.cvTrack ?? activeTrack}
               onChange={(e) => update('cvTrack', e.target.value as CvTrack)}
-              className={formControlClass}
+              className={formSelectClass}
             >
               {CV_TRACKS.map((track) => (
                 <option key={track} value={track}>
@@ -242,23 +244,7 @@ export function AddJobPage() {
                 </option>
               ))}
             </select>
-            <p className="mt-0.5 text-xs text-slate-400">
-              Used for match % and ATS tailor.
-            </p>
-          </label>
-          <label className="block">
-            <span className={formLabelClass}>Status</span>
-            <select
-              value={form.status}
-              onChange={(e) => update('status', e.target.value as JobStatus)}
-              className={formControlClass}
-            >
-              {STATUS_ORDER.map((s) => (
-                <option key={s} value={s}>
-                  {s.charAt(0).toUpperCase() + s.slice(1)}
-                </option>
-              ))}
-            </select>
+            <p className="mt-0.5 text-xs text-slate-400">Used for match % and ATS tailor.</p>
           </label>
         </div>
 

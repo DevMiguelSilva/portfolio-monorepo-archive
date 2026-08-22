@@ -13,15 +13,10 @@ import {
   formLabelClass,
   formPanelClass,
   formPrimaryBtnClass,
+  formSelectClass,
 } from '../lib/formUi'
 import { formatDualTrackScores, scoreDualTracks, scoreMasterCvAgainstJob } from '../lib/matchScore'
 import { CV_TRACK_LABELS, CV_TRACKS, type CvTrack } from '../types/cv'
-import {
-  guessJobSourceFromUrl,
-  JOB_SOURCE_LABELS,
-  MANUAL_JOB_SOURCE_OPTIONS,
-  jobSourceLabel,
-} from '../types/job'
 
 export function JobDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -31,7 +26,6 @@ export function JobDetailPage() {
   const job = id ? getJob(id) : undefined
   const [showFullJd, setShowFullJd] = useState(false)
   const [editingTrack, setEditingTrack] = useState(false)
-  const [editingSource, setEditingSource] = useState(false)
   const [editingJd, setEditingJd] = useState(false)
   const [jdDraft, setJdDraft] = useState('')
   const [savingJd, setSavingJd] = useState(false)
@@ -256,81 +250,25 @@ export function JobDetailPage() {
       </div>
 
       <section className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 sm:grid-cols-2 dark:border-track-700 dark:bg-track-800">
-        <div>
+        <div className="min-w-0">
           <span className="text-sm font-medium text-slate-500">Posting URL</span>
           {hasUrl ? (
             <a
               href={job.jobUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-1 block text-sm font-medium text-track-accent hover:underline"
+              className="mt-1 block truncate text-sm font-medium text-track-accent hover:underline"
             >
               Open original posting →
             </a>
           ) : (
             <p className="mt-1 text-sm text-slate-400">No URL on this job</p>
           )}
-          <div className="mt-3">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-medium text-slate-500">Source</span>
-              {!editingSource && (
-                <button
-                  type="button"
-                  onClick={() => setEditingSource(true)}
-                  className="text-xs font-medium text-track-accent hover:underline"
-                >
-                  Edit
-                </button>
-              )}
-            </div>
-            {editingSource ? (
-              <div className="mt-1 space-y-2">
-                <select
-                  value={job.source || 'manual'}
-                  onChange={async (e) => {
-                    await updateJob(job.id, { source: e.target.value })
-                    setEditingSource(false)
-                  }}
-                  className={formControlClass}
-                >
-                  {Array.from(
-                    new Set<string>([...MANUAL_JOB_SOURCE_OPTIONS, 'adzuna', job.source || 'manual'])
-                  ).map((value) => (
-                    <option key={value} value={value}>
-                      {JOB_SOURCE_LABELS[value] ?? jobSourceLabel(value)}
-                    </option>
-                  ))}
-                </select>
-                {hasUrl && (
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      await updateJob(job.id, { source: guessJobSourceFromUrl(job.jobUrl) })
-                      setEditingSource(false)
-                    }}
-                    className="text-xs font-medium text-track-accent hover:underline"
-                  >
-                    Detect from URL
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setEditingSource(false)}
-                  className="ml-3 text-xs text-slate-500 hover:underline"
-                >
-                  Cancel
-                </button>
-              </div>
-            ) : (
-              <div className="mt-1">
-                <SourceBadge source={job.source} size="md" />
-              </div>
-            )}
-          </div>
         </div>
-        <div>
+
+        <div className="min-w-0">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-sm font-medium text-slate-500">Master CV for match & tailor</span>
+            <span className="text-sm font-medium text-slate-500">Master CV</span>
             {!editingTrack && (
               <button
                 type="button"
@@ -342,11 +280,11 @@ export function JobDetailPage() {
             )}
           </div>
           {editingTrack ? (
-            <div className="mt-2 space-y-2">
+            <div className="mt-1 space-y-2">
               <select
                 value={selectedTrack}
                 onChange={(e) => applyTrack(e.target.value as CvTrack)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-track-accent dark:border-track-700 dark:bg-track-900"
+                className={formSelectClass}
               >
                 {CV_TRACKS.map((track) => (
                   <option key={track} value={track}>
@@ -362,11 +300,11 @@ export function JobDetailPage() {
                 Cancel
               </button>
               <p className="text-xs text-slate-400">
-                Changing this recalculates match % and which CV ATS tailor uses.
+                Recalculates match % and which CV ATS tailor uses.
               </p>
             </div>
           ) : (
-            <p className="mt-2 text-sm font-medium">{CV_TRACK_LABELS[selectedTrack]}</p>
+            <p className="mt-1 text-sm font-medium">{CV_TRACK_LABELS[selectedTrack]}</p>
           )}
         </div>
       </section>

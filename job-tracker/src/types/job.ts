@@ -150,7 +150,7 @@ export function createEmptyJob(overrides: Partial<JobApplication> = {}): JobAppl
     jdSummary: '',
     extractedSkills: [],
     extractedRequirements: [],
-    source: 'manual',
+    source: 'indeed',
     externalId: '',
     matchScore: null,
     cvTrack: null,
@@ -186,16 +186,16 @@ export const JOB_SOURCE_LABELS: Record<string, string> = {
   other: 'Other',
 }
 
-/** Sources shown in Add Job / edit dropdowns (inbox APIs still set adzuna in code). */
-export const MANUAL_JOB_SOURCE_OPTIONS = [
-  'manual',
-  'indeed',
-  'ziprecruiter',
-  'linkedin',
-  'other',
-] as const
+/**
+ * Portal sources for jobs you paste yourself (Add Job).
+ * Distinct from entry path: you always add those jobs manually; this is where the posting lived.
+ */
+export const PORTAL_JOB_SOURCE_OPTIONS = ['indeed', 'ziprecruiter', 'linkedin'] as const
 
-export type ManualJobSource = (typeof MANUAL_JOB_SOURCE_OPTIONS)[number]
+export type PortalJobSource = (typeof PORTAL_JOB_SOURCE_OPTIONS)[number]
+
+/** @deprecated use PORTAL_JOB_SOURCE_OPTIONS */
+export const MANUAL_JOB_SOURCE_OPTIONS = PORTAL_JOB_SOURCE_OPTIONS
 
 export function jobSourceLabel(source: string | null | undefined): string {
   const key = (source || 'manual').trim().toLowerCase()
@@ -204,15 +204,12 @@ export function jobSourceLabel(source: string | null | undefined): string {
   return key.charAt(0).toUpperCase() + key.slice(1)
 }
 
-/** Infer board/API from a posting URL (empty → manual). */
-export function guessJobSourceFromUrl(url: string): string {
+/** Infer portal from a posting URL (unknown / empty → Indeed). */
+export function guessJobSourceFromUrl(url: string): PortalJobSource {
   const u = url.trim().toLowerCase()
-  if (!u) return 'manual'
-  if (u.includes('indeed.')) return 'indeed'
   if (u.includes('ziprecruiter.')) return 'ziprecruiter'
   if (u.includes('linkedin.')) return 'linkedin'
-  if (u.includes('adzuna.')) return 'adzuna'
-  return 'other'
+  return 'indeed'
 }
 
 export function createEmptySavedSearch(overrides: Partial<SavedSearch> = {}): SavedSearch {

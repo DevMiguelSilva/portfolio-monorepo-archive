@@ -25,6 +25,13 @@ export const PORTAL_SOURCE_LABELS: Record<PortalSource, string> = {
   other: 'Other',
 }
 
+/** Sources offered when adding/editing a feed (legacy `other` feeds still display). */
+export const PORTAL_SOURCE_OPTIONS: Exclude<PortalSource, 'other'>[] = [
+  'indeed',
+  'ziprecruiter',
+  'linkedin',
+]
+
 export function createEmptyPortalFeed(overrides: Partial<PortalFeed> = {}): PortalFeed {
   const now = new Date().toISOString()
   return {
@@ -50,8 +57,7 @@ export function localDateKey(d = new Date()): string {
 
 export function guessPortalSource(url: string): PortalSource {
   const u = url.toLowerCase()
-  if (u.includes('indeed.')) return 'indeed'
   if (u.includes('ziprecruiter.')) return 'ziprecruiter'
   if (u.includes('linkedin.')) return 'linkedin'
-  return 'other'
+  return 'indeed'
 }

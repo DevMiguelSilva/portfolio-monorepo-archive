@@ -9,10 +9,12 @@ import {
   formLabelClass,
   formPanelClass,
   formPrimaryBtnClass,
+  formSelectClass,
 } from '../lib/formUi'
 import { countCompleteDaysInYear } from '../lib/huntStreak'
 import {
   PORTAL_SOURCE_LABELS,
+  PORTAL_SOURCE_OPTIONS,
   type PortalFeed,
   type PortalSource,
 } from '../types/portal'
@@ -72,7 +74,11 @@ export function PortalsPage() {
 
   const startEdit = (feed: PortalFeed) => {
     setEditingId(feed.id)
-    setEditDraft({ name: feed.name, url: feed.url, source: feed.source })
+    setEditDraft({
+      name: feed.name,
+      url: feed.url,
+      source: feed.source === 'other' ? 'indeed' : feed.source,
+    })
   }
 
   const saveEdit = async (id: string) => {
@@ -108,7 +114,8 @@ export function PortalsPage() {
           </Link>
           <h1 className="mt-2 text-2xl font-bold">Portals</h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
-            Save links to the job boards you check regularly, then tick them off as you go.
+            Save Indeed, ZipRecruiter, and LinkedIn links you check regularly, then tick them off as
+            you go.
           </p>
         </div>
         <button
@@ -196,7 +203,7 @@ export function PortalsPage() {
         <h2 className="font-semibold">Your feeds</h2>
         {feeds.length === 0 ? (
           <p className="text-sm text-slate-500">
-            No feeds yet. Add a link from Indeed, ZipRecruiter, or another board you use.
+            No feeds yet. Add a saved search URL from Indeed, ZipRecruiter, or LinkedIn.
           </p>
         ) : (
           <ul className="space-y-3">
@@ -228,14 +235,14 @@ export function PortalsPage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="flex min-w-0 flex-1 items-start gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex min-w-0 flex-1 items-center gap-3">
                         <input
                           type="checkbox"
                           checked={checked}
                           disabled={!feed.active}
                           onChange={() => toggleCheckedToday(feed.id)}
-                          className="mt-1 h-4 w-4 accent-emerald-600"
+                          className="h-4 w-4 shrink-0 accent-emerald-600"
                           title="Checked today"
                         />
                         <div className="min-w-0">
@@ -253,7 +260,7 @@ export function PortalsPage() {
                           </p>
                         </div>
                       </div>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <button
                           type="button"
                           onClick={() => openFeed(feed)}
@@ -353,11 +360,15 @@ function FeedFields({
       <label className="block">
         <span className={formLabelClass}>Source</span>
         <select
-          value={draft.source}
+          value={PORTAL_SOURCE_OPTIONS.includes(
+            draft.source as (typeof PORTAL_SOURCE_OPTIONS)[number]
+          )
+            ? draft.source
+            : 'indeed'}
           onChange={(e) => setDraft((d) => ({ ...d, source: e.target.value as PortalSource }))}
-          className={formControlClass}
+          className={formSelectClass}
         >
-          {(Object.keys(PORTAL_SOURCE_LABELS) as PortalSource[]).map((s) => (
+          {PORTAL_SOURCE_OPTIONS.map((s) => (
             <option key={s} value={s}>
               {PORTAL_SOURCE_LABELS[s]}
             </option>

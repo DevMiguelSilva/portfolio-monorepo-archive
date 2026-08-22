@@ -13,6 +13,7 @@ import {
   formLabelClass,
   formPanelClass,
   formPrimaryBtnClass,
+  formSelectClass,
 } from '../lib/formUi'
 import { createEmptySavedSearch, type SavedSearch, type SearchTrack } from '../types/job'
 
@@ -177,10 +178,8 @@ export function InboxPage() {
           </Link>
           <h1 className="mt-2 text-2xl font-bold">Job Inbox</h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
-            Test searches one at a time with <span className="font-medium">Run alone</span> — that
-            pauses the others, clears the review list, and refreshes only that query. Use{' '}
-            <span className="font-medium">Seen before</span> to spot roles that already appeared from
-            an earlier search. Approve keeps jobs off future inbox results.
+            Refresh saved searches, review matches, and approve roles onto the board. Run alone
+            isolates one query; Seen before marks listings that already appeared.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -229,10 +228,10 @@ export function InboxPage() {
         )}
         <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
           {activeSearches.length === 0
-            ? 'No active searches — use Run alone or Activate on a saved search.'
+            ? 'No active searches — Activate one or use Run alone.'
             : activeSearches.length === 1
               ? `Active search: ${activeSearches[0].label.trim() || activeSearches[0].query}`
-              : `${activeSearches.length} searches active (pause extras or use Run alone to isolate one).`}
+              : `${activeSearches.length} searches active.`}
         </span>
       </div>
 
@@ -247,8 +246,7 @@ export function InboxPage() {
           <div>
             <h2 className="font-semibold">Saved searches</h2>
             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              Tip: use <span className="font-medium">Run alone</span> to judge one query’s results
-              without mixing other searches.
+              Run alone pauses other searches and refreshes only that query.
             </p>
           </div>
           <ul className="space-y-3">
@@ -282,8 +280,8 @@ export function InboxPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="min-w-0">
                       <p className="font-medium">
                         {search.label.trim() || search.query}
                         {search.active ? (
@@ -305,7 +303,7 @@ export function InboxPage() {
                           : CV_TRACK_LABELS[search.track]}
                       </p>
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
                         disabled={refreshing || Boolean(runningAloneId)}
@@ -562,7 +560,7 @@ function SearchFields({
         <select
           value={draft.track}
           onChange={(e) => setDraft((d) => ({ ...d, track: e.target.value as SearchTrack }))}
-          className={formControlClass}
+          className={formSelectClass}
         >
           <option value="auto">Auto (best match)</option>
           <option value="frontend">React</option>

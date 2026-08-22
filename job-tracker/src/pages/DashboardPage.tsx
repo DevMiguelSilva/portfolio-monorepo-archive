@@ -35,7 +35,7 @@ export function DashboardPage() {
       <section className="rounded-2xl bg-gradient-to-br from-indigo-600 via-track-accent to-indigo-800 px-6 py-10 text-white sm:px-10">
         <p className="mb-1 text-sm uppercase tracking-widest text-indigo-200">ApplyTrack</p>
         <h1 className="text-3xl font-bold sm:text-4xl">Find · Tailor · Track</h1>
-        <p className="mt-2 max-w-xl text-indigo-100">
+        <p className="mt-2 max-w-4xl text-indigo-100">
           Track applications, check portals, and tailor resumes — without the busywork.
         </p>
       </section>
