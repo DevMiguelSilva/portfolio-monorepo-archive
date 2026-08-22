@@ -19,7 +19,7 @@ import {
 import { expandSearchLocations } from '../lib/searchLocations'
 import { supabase } from '../lib/supabase'
 import { CV_TRACK_LABELS, type CvTrack, type MasterCv } from '../types/cv'
-import type { InboxJob, SearchTrack } from '../types/job'
+import type { InboxJob, SavedSearch, SearchTrack } from '../types/job'
 import { createEmptyJob } from '../types/job'
 import { useAuth } from './useAuth'
 import { useJobs } from './useJobs'
@@ -33,6 +33,11 @@ export interface RefreshInboxOptions {
   onlySearchId?: string
   /** Park current "new" rows before fetching so results are only from this run. */
   clearReviewFirst?: boolean
+  /**
+   * Use this list instead of context searches (avoids stale state right after
+   * activateAll / reorder before React re-renders).
+   */
+  searchesOverride?: SavedSearch[]
 }
 
 interface InboxContextValue {
@@ -163,11 +168,12 @@ export function InboxProvider({ children }: { children: ReactNode }) {
     setRefreshing(true)
     setRefreshError(null)
     try {
+      const list = options?.searchesOverride ?? searches
       const active = options?.onlySearchId
-        ? searches
+        ? list
             .filter((s) => s.id === options.onlySearchId && s.query.trim())
             .map((s) => ({ ...s, active: true }))
-        : searches.filter((s) => s.active && s.query.trim())
+        : list.filter((s) => s.active && s.query.trim())
 
       if (active.length === 0) {
         throw new Error(
@@ -223,7 +229,6 @@ export function InboxProvider({ children }: { children: ReactNode }) {
         >()
 
         for (const leg of legs) {
-          // Remote / empty location → Canada-wide (no Adzuna `where`)
           const query =
             leg.isRemote && !/\bremote\b/i.test(search.query)
               ? `${search.query} remote`.trim()
@@ -243,7 +248,6 @@ export function InboxProvider({ children }: { children: ReactNode }) {
               resultsById.set(result.externalId, result)
               continue
             }
-            // Prefer a result that already has a clearer location label
             if (!prev.location && result.location) {
               resultsById.set(result.externalId, result)
             }

@@ -56,14 +56,18 @@ export interface SavedSearch {
   id: string
   /** Friendly name shown in the UI (e.g. "React Toronto"). */
   label: string
+  /** Adzuna `what` — search term. */
   query: string
   location: string
   country: string
   maxDaysOld: number
+  /** Space-separated terms for Adzuna what_exclude (e.g. coop internship). */
   excludeTerms: string
   /** Which master CV to score against (auto = best of both). */
   track: SearchTrack
   active: boolean
+  /** Manual list order (drag-and-drop). Lower runs / displays first. */
+  sortOrder: number
   createdAt: string
   updatedAt: string
 }
@@ -224,6 +228,7 @@ export function createEmptySavedSearch(overrides: Partial<SavedSearch> = {}): Sa
     excludeTerms: '',
     track: 'auto',
     active: true,
+    sortOrder: 0,
     createdAt: now,
     updatedAt: now,
     ...overrides,
@@ -240,6 +245,7 @@ export const DEFAULT_SAVED_SEARCHES: Omit<SavedSearch, 'id' | 'createdAt' | 'upd
     excludeTerms: '',
     track: 'frontend',
     active: true,
+    sortOrder: 0,
   },
   {
     label: 'FE Vancouver',
@@ -250,6 +256,7 @@ export const DEFAULT_SAVED_SEARCHES: Omit<SavedSearch, 'id' | 'createdAt' | 'upd
     excludeTerms: '',
     track: 'frontend',
     active: true,
+    sortOrder: 1,
   },
   {
     label: 'React Remote CA',
@@ -260,26 +267,29 @@ export const DEFAULT_SAVED_SEARCHES: Omit<SavedSearch, 'id' | 'createdAt' | 'upd
     excludeTerms: '',
     track: 'frontend',
     active: true,
+    sortOrder: 2,
   },
   {
-    label: 'Power Platform Toronto',
-    query: 'Power Platform Power Apps',
-    location: 'Toronto',
+    label: 'Power Apps',
+    query: 'Power Apps',
+    location: 'Toronto / Mississauga / Remote',
     country: 'ca',
     maxDaysOld: 7,
     excludeTerms: '',
     track: 'powerPlatform',
     active: true,
+    sortOrder: 3,
   },
   {
-    label: 'Power Automate Remote',
-    query: 'Power Automate Dataverse',
-    location: 'Remote',
+    label: 'Power Automate',
+    query: 'Power Automate',
+    location: 'Toronto / Mississauga / Remote',
     country: 'ca',
     maxDaysOld: 7,
     excludeTerms: '',
     track: 'powerPlatform',
     active: true,
+    sortOrder: 4,
   },
 ]
 

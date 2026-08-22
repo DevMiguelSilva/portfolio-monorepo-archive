@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type DragEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { SourceBadge } from '../components/SourceBadge'
@@ -22,6 +22,7 @@ const emptyDraft = {
   query: '',
   location: '',
   maxDaysOld: 7,
+  excludeTerms: '',
   track: 'auto' as SearchTrack,
 }
 
@@ -38,7 +39,15 @@ export function InboxPage() {
     approveJob,
     dismissJob,
   } = useInbox()
-  const { searches, addSearch, updateSearch, deleteSearch, activateOnly } = useSavedSearches()
+  const {
+    searches,
+    addSearch,
+    updateSearch,
+    deleteSearch,
+    activateOnly,
+    activateAll,
+    reorderSearches,
+  } = useSavedSearches()
   const [showSearches, setShowSearches] = useState(false)
   const [actionId, setActionId] = useState<string | null>(null)
   const [runningAloneId, setRunningAloneId] = useState<string | null>(null)
@@ -47,6 +56,8 @@ export function InboxPage() {
   const [showAddSearch, setShowAddSearch] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState(emptyDraft)
+  const [dragIndex, setDragIndex] = useState<number | null>(null)
+  const [dropIndex, setDropIndex] = useState<number | null>(null)
 
   const newJobs = useMemo(
     () => inbox.filter((j) => j.status === 'new').sort((a, b) => b.matchScore - a.matchScore),
@@ -75,10 +86,47 @@ export function InboxPage() {
   const handleRefresh = async () => {
     setError(null)
     try {
-      await refreshInbox()
+      let list = searches
+      if (list.length > 0 && !list.some((s) => s.active)) {
+        list = await activateAll()
+      }
+      await refreshInbox({ searchesOverride: list })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Refresh failed')
     }
+  }
+
+  const handleSearchDragStart = (index: number, event: DragEvent<HTMLElement>) => {
+    setDragIndex(index)
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', String(index))
+  }
+
+  const handleSearchDragOver = (index: number, event: DragEvent<HTMLElement>) => {
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+    if (dropIndex !== index) setDropIndex(index)
+  }
+
+  const handleSearchDrop = async (index: number) => {
+    if (dragIndex == null || dragIndex === index) {
+      setDragIndex(null)
+      setDropIndex(null)
+      return
+    }
+    try {
+      await reorderSearches(dragIndex, index)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to reorder searches')
+    } finally {
+      setDragIndex(null)
+      setDropIndex(null)
+    }
+  }
+
+  const handleSearchDragEnd = () => {
+    setDragIndex(null)
+    setDropIndex(null)
   }
 
   const handleClearReview = async () => {
@@ -137,7 +185,7 @@ export function InboxPage() {
       query: draft.query.trim(),
       location: draft.location.trim(),
       maxDaysOld: draft.maxDaysOld,
-      excludeTerms: '',
+      excludeTerms: draft.excludeTerms.trim(),
       track: draft.track,
       active: true,
     })
@@ -153,6 +201,7 @@ export function InboxPage() {
       query: search.query,
       location: search.location,
       maxDaysOld: search.maxDaysOld,
+      excludeTerms: search.excludeTerms ?? '',
       track: search.track,
     })
   }
@@ -164,6 +213,7 @@ export function InboxPage() {
       query: editDraft.query.trim(),
       location: editDraft.location.trim(),
       maxDaysOld: editDraft.maxDaysOld,
+      excludeTerms: editDraft.excludeTerms.trim(),
       track: editDraft.track,
     })
     setEditingId(null)
@@ -177,10 +227,6 @@ export function InboxPage() {
             ← Back to board
           </Link>
           <h1 className="mt-2 text-2xl font-bold">Job Inbox</h1>
-          <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
-            Refresh saved searches, review matches, and approve roles onto the board. Run alone
-            isolates one query; Seen before marks listings that already appeared.
-          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
@@ -228,7 +274,9 @@ export function InboxPage() {
         )}
         <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
           {activeSearches.length === 0
-            ? 'No active searches — Activate one or use Run alone.'
+            ? searches.length === 0
+              ? 'No saved searches yet.'
+              : 'All searches paused.'
             : activeSearches.length === 1
               ? `Active search: ${activeSearches[0].label.trim() || activeSearches[0].query}`
               : `${activeSearches.length} searches active.`}
@@ -243,20 +291,21 @@ export function InboxPage() {
 
       {showSearches && (
         <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 dark:border-track-700 dark:bg-track-800">
-          <div>
-            <h2 className="font-semibold">Saved searches</h2>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              Run alone pauses other searches and refreshes only that query.
-            </p>
-          </div>
+          <h2 className="font-semibold">Saved searches</h2>
           <ul className="space-y-3">
-            {searches.map((search) => (
+            {searches.map((search, index) => (
               <li
                 key={search.id}
+                onDragOver={(e) => handleSearchDragOver(index, e)}
+                onDrop={() => handleSearchDrop(index)}
                 className={`rounded-lg border p-3 text-sm dark:border-track-700 ${
                   search.active
                     ? 'border-track-accent/40 bg-track-accent/5 dark:bg-track-accent/10'
                     : 'border-slate-200'
+                } ${dragIndex === index ? 'opacity-40' : ''} ${
+                  dropIndex === index && dragIndex != null && dragIndex !== index
+                    ? 'ring-2 ring-track-accent/50'
+                    : ''
                 }`}
               >
                 {editingId === search.id ? (
@@ -281,27 +330,45 @@ export function InboxPage() {
                   </div>
                 ) : (
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="font-medium">
-                        {search.label.trim() || search.query}
-                        {search.active ? (
-                          <span className="ml-2 text-xs font-semibold text-track-accent">active</span>
-                        ) : (
-                          <span className="ml-2 text-xs text-slate-400">paused</span>
-                        )}
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        {search.label.trim() && search.label.trim() !== search.query
-                          ? `${search.query} · `
-                          : ''}
-                        {expandSearchLocations(search.location)
-                          .map((leg) => leg.label)
-                          .join(' · ')}{' '}
-                        · last {search.maxDaysOld}d · {search.country.toUpperCase()} · CV:{' '}
-                        {search.track === 'auto'
-                          ? 'Auto (best match)'
-                          : CV_TRACK_LABELS[search.track]}
-                      </p>
+                    <div className="flex min-w-0 flex-1 items-start gap-2">
+                      <button
+                        type="button"
+                        draggable
+                        onDragStart={(e) => handleSearchDragStart(index, e)}
+                        onDragEnd={handleSearchDragEnd}
+                        className="mt-0.5 cursor-grab select-none px-0.5 text-slate-400 active:cursor-grabbing"
+                        title="Drag to reorder"
+                        aria-label={`Reorder ${search.label.trim() || search.query}`}
+                      >
+                        ⋮⋮
+                      </button>
+                      <div className="min-w-0">
+                        <p className="font-medium">
+                          {search.label.trim() || search.query}
+                          {search.active ? (
+                            <span className="ml-2 text-xs font-semibold text-track-accent">
+                              active
+                            </span>
+                          ) : (
+                            <span className="ml-2 text-xs text-slate-400">paused</span>
+                          )}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {search.label.trim() && search.label.trim() !== search.query
+                            ? `${search.query} · `
+                            : ''}
+                          {expandSearchLocations(search.location)
+                            .map((leg) => leg.label)
+                            .join(' · ')}{' '}
+                          · last {search.maxDaysOld}d · {search.country.toUpperCase()} · CV:{' '}
+                          {search.track === 'auto'
+                            ? 'Auto (best match)'
+                            : CV_TRACK_LABELS[search.track]}
+                          {search.excludeTerms?.trim()
+                            ? ` · exclude: ${search.excludeTerms.trim()}`
+                            : ''}
+                        </p>
+                      </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <button
@@ -364,10 +431,6 @@ export function InboxPage() {
                     Cancel
                   </button>
                 </div>
-                <p className="-mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  Locations: split with <span className="font-medium">/</span> ·{' '}
-                  <span className="font-medium">Remote</span> = Canada-wide
-                </p>
                 <SearchFields draft={draft} setDraft={setDraft} />
                 <div className="flex justify-end">
                   <button type="submit" className={formPrimaryBtnClass}>
@@ -385,11 +448,6 @@ export function InboxPage() {
       ) : newJobs.length === 0 ? (
         <div className="rounded-xl border border-dashed border-slate-300 p-12 text-center dark:border-track-700">
           <h3 className="font-semibold">Inbox is empty</h3>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Open Saved searches and click <span className="font-medium">Run alone</span> on one
-            query, or Activate searches and use Refresh active. Check the message above if a run
-            returns nothing new.
-          </p>
         </div>
       ) : (
         <ul className="space-y-3">
@@ -415,10 +473,7 @@ export function InboxPage() {
                     </span>
                     <SourceBadge source={job.source} />
                     {(job.seenCount ?? 1) > 1 ? (
-                      <span
-                        className="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 ring-1 ring-inset ring-amber-300/80 dark:bg-amber-950/50 dark:text-amber-300 dark:ring-amber-700"
-                        title="This listing already appeared from a previous inbox search."
-                      >
+                      <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 ring-1 ring-inset ring-amber-300/80 dark:bg-amber-950/50 dark:text-amber-300 dark:ring-amber-700">
                         Seen before
                       </span>
                     ) : (
@@ -519,7 +574,7 @@ function SearchFields({
         <input
           value={draft.label}
           onChange={(e) => setDraft((d) => ({ ...d, label: e.target.value }))}
-          placeholder="e.g. React Toronto"
+          placeholder="Power Apps GTA"
           className={formControlClass}
         />
       </label>
@@ -539,8 +594,17 @@ function SearchFields({
         <input
           value={draft.query}
           onChange={(e) => setDraft((d) => ({ ...d, query: e.target.value }))}
-          placeholder="e.g. React TypeScript"
+          placeholder="Power Apps"
           required
+          className={formControlClass}
+        />
+      </label>
+      <label className="block sm:col-span-2">
+        <span className={formLabelClass}>Exclude</span>
+        <input
+          value={draft.excludeTerms}
+          onChange={(e) => setDraft((d) => ({ ...d, excludeTerms: e.target.value }))}
+          placeholder="coop internship"
           className={formControlClass}
         />
       </label>

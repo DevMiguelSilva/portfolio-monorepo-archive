@@ -18,6 +18,3 @@ export const formPrimaryBtnClass =
 
 export const formAccentBtnClass =
   'rounded-lg bg-track-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-600'
-
-/** Short page intros — wide enough to read as a full line on most screens. */
-export const pageBlurbClass = 'mt-1 max-w-4xl text-sm text-slate-500 dark:text-slate-400'

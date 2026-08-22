@@ -57,13 +57,23 @@ create table if not exists saved_searches (
   country text not null default 'ca',
   max_days_old integer not null default 7,
   exclude_terms text not null default '',
+  query_mode text not null default 'any',
+  what_or text not null default '',
+  what_and text not null default '',
+  what_phrase text not null default '',
   track text not null default 'auto' check (track in ('auto', 'frontend', 'powerPlatform')),
   active boolean not null default true,
+  sort_order integer not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
 alter table saved_searches add column if not exists track text not null default 'auto';
+alter table saved_searches add column if not exists sort_order integer not null default 0;
+alter table saved_searches add column if not exists query_mode text not null default 'any';
+alter table saved_searches add column if not exists what_or text not null default '';
+alter table saved_searches add column if not exists what_and text not null default '';
+alter table saved_searches add column if not exists what_phrase text not null default '';
 alter table job_applications add column if not exists cv_track text;
 alter table job_inbox add column if not exists matched_track text;
 

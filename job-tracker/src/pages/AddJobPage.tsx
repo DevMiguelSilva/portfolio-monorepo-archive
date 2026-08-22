@@ -10,7 +10,6 @@ import {
   formGridClass,
   formLabelClass,
   formSelectClass,
-  pageBlurbClass,
 } from '../lib/formUi'
 import { scoreMasterCvAgainstJob } from '../lib/matchScore'
 import { CV_TRACK_LABELS, CV_TRACKS, type CvTrack } from '../types/cv'
@@ -113,18 +112,10 @@ export function AddJobPage() {
           ← Back to board
         </Link>
         <h1 className="mt-2 text-2xl font-bold">Add Application</h1>
-        <p className={pageBlurbClass}>
-          Paste a posting to extract fields, or fill them in yourself. New applications land in
-          Saved.
-        </p>
       </div>
 
       <div className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-5 dark:border-indigo-900 dark:bg-indigo-950/20">
-        <h2 className="mb-2 font-semibold">Quick add with AI</h2>
-        <p className="mb-3 text-sm text-slate-500 dark:text-slate-400">
-          Paste the full posting. AI fills company, role, location, salary, and skills; the original
-          text is kept for interview prep.
-        </p>
+        <h2 className="mb-3 font-semibold">Quick add with AI</h2>
         <textarea
           value={pasteText}
           onChange={(e) => {
@@ -207,9 +198,6 @@ export function AddJobPage() {
               placeholder="https://indeed.com/… or LinkedIn / ZipRecruiter"
               className={formControlClass}
             />
-            <p className="mt-0.5 text-xs text-slate-400">
-              Auto-detects portal (Indeed, LinkedIn, ZipRecruiter).
-            </p>
           </label>
           <label className="block">
             <span className={formLabelClass}>Portal</span>
@@ -227,7 +215,6 @@ export function AddJobPage() {
                 </option>
               ))}
             </select>
-            <p className="mt-0.5 text-xs text-slate-400">Where the posting was listed.</p>
           </label>
           <label className="block">
             <span className={formLabelClass}>
@@ -244,7 +231,6 @@ export function AddJobPage() {
                 </option>
               ))}
             </select>
-            <p className="mt-0.5 text-xs text-slate-400">Used for match % and ATS tailor.</p>
           </label>
         </div>
 
@@ -257,9 +243,6 @@ export function AddJobPage() {
 
         <label className="block">
           <span className={formLabelClass}>Full job description</span>
-          <p className="mt-0.5 text-xs text-slate-400">
-            Stored as-is for interview prep. Edit only if you need to correct the paste.
-          </p>
           <textarea
             value={form.jobDescription}
             onChange={(e) => {

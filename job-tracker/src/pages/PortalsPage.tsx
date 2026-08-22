@@ -113,10 +113,6 @@ export function PortalsPage() {
             ← Back to board
           </Link>
           <h1 className="mt-2 text-2xl font-bold">Portals</h1>
-          <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
-            Save Indeed, ZipRecruiter, and LinkedIn links you check regularly, then tick them off as
-            you go.
-          </p>
         </div>
         <button
           type="button"
@@ -188,7 +184,7 @@ export function PortalsPage() {
           </div>
         </div>
         {activeIds.length === 0 ? (
-          <p className="text-sm text-slate-500">Add at least one active feed to start a streak.</p>
+          <p className="text-sm text-slate-500">No active feeds.</p>
         ) : (
           <ActivityHeatmap
             variant="portal"
@@ -203,7 +199,7 @@ export function PortalsPage() {
         <h2 className="font-semibold">Your feeds</h2>
         {feeds.length === 0 ? (
           <p className="text-sm text-slate-500">
-            No feeds yet. Add a saved search URL from Indeed, ZipRecruiter, or LinkedIn.
+            No feeds yet.
           </p>
         ) : (
           <ul className="space-y-3">

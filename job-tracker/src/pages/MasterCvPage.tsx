@@ -110,11 +110,6 @@ export function MasterCvPage() {
           ← Back to board
         </Link>
         <h1 className="mt-2 text-2xl font-bold">Master CVs</h1>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          Keep two templates — Front-end and Power Platform. Upload a .docx/.txt to fill the form,
-          then edit anytime. Inbox matching uses the track on each saved search (or auto-picks the
-          best).
-        </p>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -139,10 +134,6 @@ export function MasterCvPage() {
 
       <section className="space-y-3 rounded-xl border border-dashed border-slate-300 bg-white p-5 dark:border-track-700 dark:bg-track-800">
         <h2 className="font-semibold">Attach resume → fill form</h2>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          Upload your {CV_TRACK_LABELS[editingTrack]} resume (.docx or .txt). We extract text, store
-          the attachment metadata, and map what we can into the editable fields below.
-        </p>
         <input
           type="file"
           accept=".docx,.txt,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -589,7 +580,6 @@ function EducationEditor({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="font-semibold">Education</h2>
-          <p className="text-xs text-slate-400">Degrees and diplomas only — certs go below.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {movable > 0 && (
@@ -686,7 +676,6 @@ function CertificationsEditor({
       <div className="flex items-center justify-between">
         <div>
           <h2 className="font-semibold">Certifications</h2>
-          <p className="text-xs text-slate-400">Microsoft, cloud, and other professional certs.</p>
         </div>
         <button
           type="button"

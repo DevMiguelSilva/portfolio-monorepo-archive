@@ -1,5 +1,6 @@
 import type { CvTrack, GapReport, MasterCv, TailoredDocument } from '../types/cv'
 import { EMPTY_GAP_REPORT } from '../types/cv'
+import { coalesceSearchQuery } from './adzunaQuery'
 import type { InboxJob, JobApplication, SavedSearch, SearchTrack, UserProfile } from '../types/job'
 import { resolveJdComplete } from '../types/job'
 
@@ -42,12 +43,17 @@ export interface SavedSearchRow {
   user_id: string
   label?: string
   query: string
+  query_mode?: string | null
+  what_or?: string | null
+  what_and?: string | null
+  what_phrase?: string | null
   location: string
   country: string
   max_days_old: number
   exclude_terms: string
   track?: string
   active: boolean
+  sort_order?: number | null
   created_at: string
   updated_at: string
 }
@@ -182,13 +188,19 @@ export function rowToSavedSearch(row: SavedSearchRow): SavedSearch {
   return {
     id: row.id,
     label: row.label ?? '',
-    query: row.query,
+    query: coalesceSearchQuery({
+      query: row.query ?? '',
+      whatOr: row.what_or ?? '',
+      whatAnd: row.what_and ?? '',
+      whatPhrase: row.what_phrase ?? '',
+    }),
     location: row.location,
     country: row.country,
     maxDaysOld: row.max_days_old,
-    excludeTerms: row.exclude_terms,
+    excludeTerms: row.exclude_terms ?? '',
     track: asSearchTrack(row.track),
     active: row.active,
+    sortOrder: typeof row.sort_order === 'number' ? row.sort_order : 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -203,12 +215,17 @@ export function savedSearchToRow(
     user_id: userId,
     label: search.label ?? '',
     query: search.query,
+    query_mode: 'any',
+    what_or: '',
+    what_and: '',
+    what_phrase: '',
     location: search.location,
     country: search.country,
     max_days_old: search.maxDaysOld,
-    exclude_terms: search.excludeTerms,
+    exclude_terms: search.excludeTerms ?? '',
     track: search.track,
     active: search.active,
+    sort_order: search.sortOrder,
     updated_at: new Date().toISOString(),
   }
 }

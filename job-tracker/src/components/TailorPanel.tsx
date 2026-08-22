@@ -368,10 +368,6 @@ export function TailorPanel({ job }: TailorPanelProps) {
               {loading === 'pack' ? 'Packing…' : 'Download application folder'}
             </button>
           </div>
-          <p className="mt-2 text-xs text-slate-400">
-            Resume_MiguelSilva.docx · CoverLetter_MiguelSilva.docx · ZIP named after the company
-            (spaces kept).
-          </p>
         </div>
       )}
 

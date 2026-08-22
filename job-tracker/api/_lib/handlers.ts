@@ -19,6 +19,7 @@ export async function handleAdzunaSearch(body: unknown, env: ServerEnv): Promise
   try {
     const input = (body ?? {}) as {
       query?: string
+      what?: string
       location?: string
       country?: string
       maxDaysOld?: number
@@ -26,11 +27,12 @@ export async function handleAdzunaSearch(body: unknown, env: ServerEnv): Promise
       page?: number
       resultsPerPage?: number
     }
-    if (!input.query?.trim()) return fail(400, 'query is required')
+    const query = (input.query ?? input.what ?? '').trim()
+    if (!query) return fail(400, 'query is required')
 
     const results = await searchAdzuna(
       {
-        query: input.query.trim(),
+        query,
         location: input.location,
         country: input.country,
         maxDaysOld: input.maxDaysOld,

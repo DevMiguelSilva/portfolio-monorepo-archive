@@ -299,9 +299,6 @@ export function JobDetailPage() {
               >
                 Cancel
               </button>
-              <p className="text-xs text-slate-400">
-                Recalculates match % and which CV ATS tailor uses.
-              </p>
             </div>
           ) : (
             <p className="mt-1 text-sm font-medium">{CV_TRACK_LABELS[selectedTrack]}</p>
@@ -321,11 +318,6 @@ export function JobDetailPage() {
             <h2 className="font-semibold">
               {jdIncomplete ? 'Complete the job description' : 'Update job description'}
             </h2>
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-              {jdIncomplete
-                ? 'This listing came from an API preview. Open the posting, copy the full JD, paste it here, then save to refresh match %.'
-                : 'Replace the stored JD and recalculate match against your Master CV.'}
-            </p>
           </div>
 
           {!editingJd ? (
@@ -462,9 +454,7 @@ export function JobDetailPage() {
               )}
             </div>
           ) : (
-            <p className="text-sm text-slate-500">
-              No JD saved yet. Paste the full posting above to unlock accurate match scoring.
-            </p>
+            <p className="text-sm text-slate-500">No JD saved yet.</p>
           )}
         </section>
       )}

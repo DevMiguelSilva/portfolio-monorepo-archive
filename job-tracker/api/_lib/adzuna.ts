@@ -61,13 +61,14 @@ export async function searchAdzuna(
   const country = (params.country || 'ca').toLowerCase()
   const page = params.page ?? 1
   const resultsPerPage = Math.min(params.resultsPerPage ?? 25, 50)
+  const query = params.query.trim()
+  if (!query) throw new Error('query is required')
 
   const url = new URL(`https://api.adzuna.com/v1/api/jobs/${country}/search/${page}`)
   url.searchParams.set('app_id', appId)
   url.searchParams.set('app_key', appKey)
   url.searchParams.set('results_per_page', String(resultsPerPage))
-  url.searchParams.set('what', params.query)
-  // Empty / omitted location = country-wide (e.g. Canada when country=ca)
+  url.searchParams.set('what', query)
   if (params.location?.trim()) url.searchParams.set('where', params.location.trim())
   if (params.maxDaysOld) url.searchParams.set('max_days_old', String(params.maxDaysOld))
   if (params.excludeTerms?.trim()) url.searchParams.set('what_exclude', params.excludeTerms.trim())

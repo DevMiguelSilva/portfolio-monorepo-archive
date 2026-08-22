@@ -35,9 +35,6 @@ export function DashboardPage() {
       <section className="rounded-2xl bg-gradient-to-br from-indigo-600 via-track-accent to-indigo-800 px-6 py-10 text-white sm:px-10">
         <p className="mb-1 text-sm uppercase tracking-widest text-indigo-200">ApplyTrack</p>
         <h1 className="text-3xl font-bold sm:text-4xl">Find · Tailor · Track</h1>
-        <p className="mt-2 max-w-4xl text-indigo-100">
-          Track applications, check portals, and tailor resumes — without the busywork.
-        </p>
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-track-700 dark:bg-track-800">
@@ -137,9 +134,6 @@ export function DashboardPage() {
           <div className="rounded-xl border border-dashed border-slate-300 p-12 text-center dark:border-track-700">
             <p className="text-4xl">📋</p>
             <h3 className="mt-3 font-semibold">No applications yet</h3>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Approve from Inbox or add a job, then mark it Applied to grow your streak.
-            </p>
             <Link
               to="/add"
               className="mt-4 inline-block rounded-lg bg-track-accent px-4 py-2 text-sm font-medium text-white hover:bg-indigo-600"
