@@ -574,7 +574,6 @@ function SearchFields({
         <input
           value={draft.label}
           onChange={(e) => setDraft((d) => ({ ...d, label: e.target.value }))}
-          placeholder="Power Apps GTA"
           className={formControlClass}
         />
       </label>
@@ -583,7 +582,6 @@ function SearchFields({
         <input
           value={draft.location}
           onChange={(e) => setDraft((d) => ({ ...d, location: e.target.value }))}
-          placeholder="Toronto / Mississauga / Remote"
           className={formControlClass}
         />
       </label>
@@ -594,7 +592,6 @@ function SearchFields({
         <input
           value={draft.query}
           onChange={(e) => setDraft((d) => ({ ...d, query: e.target.value }))}
-          placeholder="Power Apps"
           required
           className={formControlClass}
         />
@@ -604,7 +601,6 @@ function SearchFields({
         <input
           value={draft.excludeTerms}
           onChange={(e) => setDraft((d) => ({ ...d, excludeTerms: e.target.value }))}
-          placeholder="coop internship"
           className={formControlClass}
         />
       </label>
