@@ -124,7 +124,6 @@ export function AddJobPage() {
             setForm((prev) => ({ ...prev, jobDescription: value }))
           }}
           rows={8}
-          placeholder="Paste the full job description here…"
           className="w-full rounded-lg border border-slate-300 bg-white p-3 text-sm outline-none focus:border-track-accent dark:border-track-700 dark:bg-track-900"
         />
         <button
@@ -176,7 +175,6 @@ export function AddJobPage() {
             <input
               value={form.location}
               onChange={(e) => update('location', e.target.value)}
-              placeholder="Toronto, ON / Remote"
               className={formControlClass}
             />
           </label>
@@ -185,7 +183,6 @@ export function AddJobPage() {
             <input
               value={form.salary}
               onChange={(e) => update('salary', e.target.value)}
-              placeholder="$60k – $80k CAD"
               className={formControlClass}
             />
           </label>
@@ -195,7 +192,6 @@ export function AddJobPage() {
               type="url"
               value={form.jobUrl}
               onChange={(e) => setJobUrl(e.target.value)}
-              placeholder="https://indeed.com/… or LinkedIn / ZipRecruiter"
               className={formControlClass}
             />
           </label>
@@ -250,7 +246,6 @@ export function AddJobPage() {
               setPasteText(e.target.value)
             }}
             rows={8}
-            placeholder="Full original JD…"
             className={formControlClass}
           />
         </label>
@@ -261,7 +256,6 @@ export function AddJobPage() {
             value={form.notes}
             onChange={(e) => update('notes', e.target.value)}
             rows={2}
-            placeholder="Referral, deadline, how you found it…"
             className={formControlClass}
           />
         </label>

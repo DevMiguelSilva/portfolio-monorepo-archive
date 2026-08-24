@@ -229,17 +229,15 @@ export function InboxProvider({ children }: { children: ReactNode }) {
         >()
 
         for (const leg of legs) {
-          const query =
-            leg.isRemote && !/\bremote\b/i.test(search.query)
-              ? `${search.query} remote`.trim()
-              : search.query
-
           const results = await fetchAdzunaJobs({
-            query,
+            query: search.query,
             location: leg.location || undefined,
             country: search.country,
             maxDaysOld: search.maxDaysOld,
             excludeTerms: search.excludeTerms,
+            // Keep "remote" out of what_phrase so "Power Apps" stays an exact phrase.
+            requireRemote:
+              leg.isRemote && !/\bremote\b/i.test(search.query),
           })
 
           for (const result of results) {

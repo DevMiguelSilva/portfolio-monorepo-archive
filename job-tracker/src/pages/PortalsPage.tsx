@@ -349,7 +349,6 @@ function FeedFields({
         <input
           value={draft.name}
           onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-          placeholder="e.g. Indeed FE Toronto"
           className={formControlClass}
         />
       </label>
@@ -378,7 +377,6 @@ function FeedFields({
         <input
           value={draft.url}
           onChange={(e) => setDraft((d) => ({ ...d, url: e.target.value }))}
-          placeholder="https://ca.indeed.com/jobs?q=..."
           required
           className={formControlClass}
         />

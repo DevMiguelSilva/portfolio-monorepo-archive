@@ -1,11 +1,14 @@
 import { getAdzunaCredentials, type ServerEnv } from './env.js'
 
 export interface AdzunaSearchParams {
+  /** Exact phrase for Adzuna `what_phrase` (one term / title per saved search). */
   query: string
   location?: string
   country?: string
   maxDaysOld?: number
   excludeTerms?: string
+  /** When true, also require the keyword "remote" without folding it into the phrase. */
+  requireRemote?: boolean
   page?: number
   resultsPerPage?: number
 }
@@ -68,7 +71,9 @@ export async function searchAdzuna(
   url.searchParams.set('app_id', appId)
   url.searchParams.set('app_key', appKey)
   url.searchParams.set('results_per_page', String(resultsPerPage))
-  url.searchParams.set('what', query)
+  // Exact phrase — avoids loose keyword hits (e.g. "Power Apps" matching just "power").
+  url.searchParams.set('what_phrase', query)
+  if (params.requireRemote) url.searchParams.set('what_and', 'remote')
   if (params.location?.trim()) url.searchParams.set('where', params.location.trim())
   if (params.maxDaysOld) url.searchParams.set('max_days_old', String(params.maxDaysOld))
   if (params.excludeTerms?.trim()) url.searchParams.set('what_exclude', params.excludeTerms.trim())

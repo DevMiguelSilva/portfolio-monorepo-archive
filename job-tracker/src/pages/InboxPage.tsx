@@ -587,7 +587,7 @@ function SearchFields({
       </label>
       <label className="block sm:col-span-2">
         <span className={formLabelClass}>
-          Query <span className="text-red-500">*</span>
+          Phrase <span className="text-red-500">*</span>
         </span>
         <input
           value={draft.query}

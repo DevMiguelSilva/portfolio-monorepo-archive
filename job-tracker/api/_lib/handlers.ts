@@ -24,6 +24,7 @@ export async function handleAdzunaSearch(body: unknown, env: ServerEnv): Promise
       country?: string
       maxDaysOld?: number
       excludeTerms?: string
+      requireRemote?: boolean
       page?: number
       resultsPerPage?: number
     }
@@ -37,6 +38,7 @@ export async function handleAdzunaSearch(body: unknown, env: ServerEnv): Promise
         country: input.country,
         maxDaysOld: input.maxDaysOld,
         excludeTerms: input.excludeTerms,
+        requireRemote: Boolean(input.requireRemote),
         page: input.page,
         resultsPerPage: input.resultsPerPage,
       },

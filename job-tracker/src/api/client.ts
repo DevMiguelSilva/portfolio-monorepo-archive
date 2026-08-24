@@ -26,11 +26,14 @@ export interface AdzunaClientJob {
 }
 
 export async function fetchAdzunaJobs(params: {
+  /** Exact phrase (`what_phrase`) — one term per saved search. */
   query: string
   location?: string
   country?: string
   maxDaysOld?: number
   excludeTerms?: string
+  /** Require keyword "remote" without changing the phrase. */
+  requireRemote?: boolean
 }): Promise<AdzunaClientJob[]> {
   const data = await apiPost<{ results: AdzunaClientJob[] }>('/api/adzuna/search', params)
   return data.results ?? []

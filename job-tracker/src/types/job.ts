@@ -56,7 +56,7 @@ export interface SavedSearch {
   id: string
   /** Friendly name shown in the UI (e.g. "React Toronto"). */
   label: string
-  /** Adzuna `what` — search term. */
+  /** Adzuna `what_phrase` — exact phrase (one term / spelling per saved search). */
   query: string
   location: string
   country: string
