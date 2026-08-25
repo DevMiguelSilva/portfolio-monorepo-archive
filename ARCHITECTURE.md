@@ -6,6 +6,8 @@ This repo is a **monorepo of independent products**, not one embedded app.
 C:\Dev\Portfolio/             ← repo root (open this folder in Cursor)
 ├── portfolio/              ← marketing site (about you, project links)
 ├── job-tracker/            ← ApplyTrack (standalone product)
+├── expense-tracker/        ← Splitplan (standalone)
+├── fit-tracker/            ← FitTrack (standalone)
 ├── ARCHITECTURE.md
 ├── DEPLOY.md
 └── README.md
@@ -26,6 +28,9 @@ cd portfolio && npm install && npm run dev
 
 # ApplyTrack
 cd job-tracker && npm install && npm run dev
+
+# FitTrack
+cd fit-tracker && npm install && npm run dev
 ```
 
 ## Adding a third project

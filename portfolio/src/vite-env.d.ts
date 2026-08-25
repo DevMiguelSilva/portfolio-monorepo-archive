@@ -3,6 +3,7 @@
 interface ImportMetaEnv {
   readonly VITE_MOVIE_APP_URL?: string
   readonly VITE_JOB_TRACKER_URL?: string
+  readonly VITE_FIT_TRACKER_URL?: string
   readonly VITE_GITHUB_URL?: string
 }
 

@@ -24,6 +24,12 @@ const accentStyles: Record<
     dot: 'bg-sky-500',
     gradient: 'from-sky-500/10 via-blue-500/5 to-indigo-500/10',
   },
+  orange: {
+    ring: 'ring-orange-100',
+    badge: 'bg-orange-50 text-orange-800 ring-orange-100',
+    dot: 'bg-orange-500',
+    gradient: 'from-orange-500/10 via-amber-500/5 to-rose-500/10',
+  },
 }
 
 function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
@@ -236,10 +242,10 @@ export function Projects() {
       <div className="mx-auto max-w-6xl">
         <p className="section-label">Projects</p>
         <h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-stone-900 sm:text-4xl">
-          Featured project
+          Projects
         </h2>
         <p className="mt-3 max-w-2xl text-stone-600">
-          Built to solve my own job search — deployed and maintained, not just a tutorial.
+          Shipped products I use myself — ApplyTrack for the job hunt, FitTrack for training.
         </p>
         <div className="mt-12 grid gap-8">
           {projects.map((project) => (
