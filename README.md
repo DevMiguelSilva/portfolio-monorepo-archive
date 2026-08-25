@@ -8,6 +8,7 @@ Personal workspace for **Miguel Silva** — portfolio site plus independent prod
 |---------|--------|-------|-------------|
 | **Portfolio Site** | [portfolio](./portfolio) | React, TypeScript, Tailwind | Main landing page showcasing work |
 | **ApplyTrack — AI Job Tracker** | [job-tracker](./job-tracker) | React, Gemini AI, Supabase | Kanban job board with AI tools + cloud sync |
+| **FitTrack — Workouts & weight** | [fit-tracker](./fit-tracker) | React, TypeScript, Tailwind, Supabase | Daily set checklist + weekly kg average |
 
 ## Structure
 
@@ -15,6 +16,8 @@ Personal workspace for **Miguel Silva** — portfolio site plus independent prod
 Portfolio/
 ├── portfolio/         ← Main portfolio website
 ├── job-tracker/       ← ApplyTrack (standalone product)
+├── expense-tracker/   ← Splitplan (standalone, not on the site yet)
+├── fit-tracker/       ← FitTrack (standalone product)
 ├── ARCHITECTURE.md    ← Monorepo layout & product boundaries
 ├── DEPLOY.md          ← Step-by-step deploy guide
 └── README.md
@@ -27,6 +30,7 @@ From the repo root (`C:\Dev\Portfolio`):
 ```bash
 cd portfolio && npm install && npm run dev
 cd job-tracker && npm install && npm run dev
+cd fit-tracker && npm install && npm run dev
 ```
 
 Copy `.env.example` → `.env` in each app that needs API keys.

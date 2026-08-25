@@ -1,4 +1,4 @@
-import { getJobTrackerUrl } from '../config/links'
+import { getFitTrackerUrl, getJobTrackerUrl } from '../config/links'
 
 export interface Project {
   id: string
@@ -33,6 +33,24 @@ export const projects: Project[] = [
     featured: true,
     accent: 'teal',
   },
+  {
+    id: 'fit-tracker',
+    title: 'FitTrack',
+    tagline: 'Workouts and weekly body weight',
+    description:
+      'A personal training log I built to keep routines, daily sessions, and body weight in one place. Each week I pick a routine, check off exercises, and record lift loads in pounds for that session without changing the plan I use as a guide. Daily weigh-ins in kilograms roll into a weekly average that skips missed days instead of treating them as zero. Optional Supabase sign-in syncs across devices; without it, data stays on the device.',
+    stack: ['React', 'TypeScript', 'Supabase', 'Tailwind', 'Vite'],
+    highlights: [
+      'Custom routines and a once-per-week session',
+      'Session loads vs routine guide (lb)',
+      'Daily kg log and weekly average',
+      'Week goal from routines you had on Monday',
+      'Cloud sync or local-only fallback',
+    ],
+    liveUrl: getFitTrackerUrl(),
+    githubUrl: 'https://github.com/DevMiguelSilva/Portfolio/tree/main/fit-tracker',
+    accent: 'orange',
+  },
 ]
 
 export const skillGroups = [
@@ -56,7 +74,7 @@ export const skillGroups = [
 
 export const stats = [
   { value: '6+', label: 'Years front-end experience' },
-  { value: '1', label: 'Live portfolio app' },
+  { value: '2', label: 'Live portfolio apps' },
   { value: 'AI', label: 'Tailored job-search tooling' },
 ]
 

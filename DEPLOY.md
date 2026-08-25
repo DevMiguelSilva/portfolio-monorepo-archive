@@ -1,6 +1,6 @@
 # Deploy Guide — Miguel Silva Portfolio
 
-Deploy both apps for free using **Vercel** + **Supabase**.
+Deploy each app for free using **Vercel** + **Supabase**.
 
 ## Overview
 
@@ -8,6 +8,7 @@ Deploy both apps for free using **Vercel** + **Supabase**.
 |-----|--------|----------|----------|
 | Portfolio | `portfolio/` | Vercel | — |
 | ApplyTrack | `job-tracker/` | Vercel | Supabase |
+| FitTrack | `fit-tracker/` | Vercel | Supabase (separate project) |
 
 ---
 
@@ -22,23 +23,29 @@ git push origin main
 
 ---
 
-## Step 2 — Set up Supabase (job tracker database)
+## Step 2 — Set up Supabase
+
+Use **separate** Supabase projects for ApplyTrack and FitTrack.
+
+### ApplyTrack
 
 1. Create a free account at [supabase.com](https://supabase.com)
 2. **New project** → pick a name, password, region (closest to Canada)
-3. Go to **SQL Editor** → paste contents of `job-tracker/supabase/schema.sql` → **Run**
-4. Go to **Project Settings → API** and copy:
-   - **Project URL** → `VITE_SUPABASE_URL`
-   - **anon public key** → `VITE_SUPABASE_ANON_KEY`
-5. Go to **Authentication → Providers** → enable **Email** (enabled by default)
+3. **SQL Editor** → paste `job-tracker/supabase/schema.sql` → **Run**
+4. **Project Settings → API** — copy **Project URL** (`VITE_SUPABASE_URL`) and **anon** / **publishable** key (`VITE_SUPABASE_ANON_KEY`)
+5. **Authentication → Providers** → **Email** enabled
+
+### FitTrack
+
+Same steps in a **second** Supabase project, using `fit-tracker/supabase/schema.sql`.
 
 ---
 
 ## Step 3 — Deploy on Vercel
 
-Go to [vercel.com](https://vercel.com) → **Add New Project** → import `DevMiguelSilva/Portfolio`
+Go to [vercel.com](https://vercel.com) → **Add New Project** → import `DevMiguelSilva/Portafolio` (or `Portfolio` if you renamed the remote)
 
-Deploy **each app as a separate Vercel project** (recommended):
+Deploy **each app as a separate Vercel project**:
 
 ### Portfolio (`portfolio/`)
 
@@ -51,6 +58,7 @@ Deploy **each app as a separate Vercel project** (recommended):
 
 ```
 VITE_JOB_TRACKER_URL=https://your-job-tracker.vercel.app
+VITE_FIT_TRACKER_URL=https://your-fit-tracker.vercel.app
 VITE_GITHUB_URL=https://github.com/DevMiguelSilva
 VITE_LINKEDIN_URL=https://www.linkedin.com/in/miguel-silva-dev/
 ```
@@ -74,14 +82,30 @@ VITE_SUPABASE_ANON_KEY=your_anon_key
 
 Re-run `job-tracker/supabase/schema.sql` after pulling schema updates.
 
+### FitTrack (`fit-tracker/`)
+
+| Setting | Value |
+|---------|-------|
+| Root Directory | `fit-tracker` |
+
+**Environment variables:**
+
+```
+VITE_SUPABASE_URL=https://xxx.supabase.co
+VITE_SUPABASE_ANON_KEY=your_anon_or_publishable_key
+```
+
+Re-run `fit-tracker/supabase/schema.sql` after pulling schema updates (includes `actual_loads` and `finished` on `sessions`).
+
 ---
 
-## Step 4 — Link portfolio to live demo
+## Step 4 — Link portfolio to live demos
 
-After deploying job-tracker, copy its Vercel URL and update the **portfolio** project's env var:
+After deploying the product apps, set the **portfolio** project env vars:
 
 ```
 VITE_JOB_TRACKER_URL=https://job-tracker-xxx.vercel.app
+VITE_FIT_TRACKER_URL=https://fit-tracker-xxx.vercel.app
 ```
 
 Redeploy the portfolio (Vercel auto-redeploys on env change).
@@ -90,9 +114,10 @@ Redeploy the portfolio (Vercel auto-redeploys on env change).
 
 ## Step 5 — Test everything
 
-- [ ] Portfolio loads with ApplyTrack featured project
-- [ ] Job tracker: sign up → sign in → add job → AI parse works
-- [ ] Job tracker: data persists after refresh (Synced badge in header)
+- [ ] Portfolio loads with ApplyTrack and FitTrack
+- [ ] ApplyTrack: sign up → sign in → add job → AI parse works
+- [ ] FitTrack: add a routine → start today → log kg → Progress shows the week
+- [ ] Data persists after refresh when signed in (Synced badge)
 
 ---
 

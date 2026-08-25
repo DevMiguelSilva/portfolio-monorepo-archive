@@ -4,6 +4,7 @@
  */
 export const LIVE_URLS = {
   jobTracker: 'https://portafolio-mu-two-49.vercel.app',
+  fitTracker: '',
 }
 
 function resolveLiveUrl(envValue: string | undefined, fallback: string): string {
@@ -16,4 +17,8 @@ function resolveLiveUrl(envValue: string | undefined, fallback: string): string 
 
 export function getJobTrackerUrl(): string {
   return resolveLiveUrl(import.meta.env.VITE_JOB_TRACKER_URL, LIVE_URLS.jobTracker)
+}
+
+export function getFitTrackerUrl(): string {
+  return resolveLiveUrl(import.meta.env.VITE_FIT_TRACKER_URL, LIVE_URLS.fitTracker)
 }
