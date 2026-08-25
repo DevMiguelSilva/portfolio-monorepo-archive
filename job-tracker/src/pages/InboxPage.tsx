@@ -86,10 +86,8 @@ export function InboxPage() {
   const handleRefresh = async () => {
     setError(null)
     try {
-      let list = searches
-      if (list.length > 0 && !list.some((s) => s.active)) {
-        list = await activateAll()
-      }
+      // Always turn every saved search on, then merge results from all of them.
+      const list = searches.length > 0 ? await activateAll() : searches
       await refreshInbox({ searchesOverride: list })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Refresh failed')
@@ -250,7 +248,7 @@ export function InboxPage() {
             disabled={refreshing || Boolean(runningAloneId)}
             className="rounded-lg bg-track-accent px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600 disabled:opacity-50"
           >
-            {refreshing && !runningAloneId ? 'Refreshing…' : 'Refresh active'}
+            {refreshing && !runningAloneId ? 'Refreshing…' : 'Refresh all'}
           </button>
         </div>
       </div>
