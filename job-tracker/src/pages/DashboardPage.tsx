@@ -172,7 +172,7 @@ export function DashboardPage() {
               value={boardSearch}
               onChange={(e) => setBoardSearch(e.target.value)}
               placeholder="Company, role, URL…"
-              className="w-full rounded-full border border-slate-200 bg-white py-2.5 pl-9 pr-9 text-sm outline-none ring-sky-100 transition placeholder:text-slate-400 focus:border-sky-400 focus:ring-2"
+              className="w-full appearance-none rounded-full border border-slate-200 bg-white py-2.5 pl-9 pr-9 text-sm outline-none ring-sky-100 transition placeholder:text-slate-400 focus:border-sky-400 focus:ring-2"
               autoComplete="off"
             />
             {boardSearch && (

@@ -47,6 +47,16 @@
     scrollbar-color: rgb(148 163 184 / 0.55) transparent;
   }
 
+  /* Custom clear control is used; hide the native WebKit/Blink cancel icon. */
+  input[type='search']::-webkit-search-cancel-button,
+  input[type='search']::-webkit-search-decoration,
+  input[type='search']::-webkit-search-results-button,
+  input[type='search']::-webkit-search-results-decoration {
+    -webkit-appearance: none;
+    appearance: none;
+    display: none;
+  }
+
   body {
     @apply bg-surface-50 text-slate-900 antialiased;
   }
