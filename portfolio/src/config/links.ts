@@ -4,7 +4,7 @@
  */
 export const LIVE_URLS = {
   jobTracker: 'https://portafolio-mu-two-49.vercel.app',
-  fitTracker: '',
+  fitTracker: 'https://fit-tracker-jet-ten.vercel.app',
 }
 
 function resolveLiveUrl(envValue: string | undefined, fallback: string): string {
