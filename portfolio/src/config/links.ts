@@ -3,8 +3,8 @@
  * jobTracker: legacy Vercel hostname (rename project in Vercel dashboard if desired).
  */
 export const LIVE_URLS = {
-  jobTracker: 'https://applytrack-miguel.vercel.app',
-  fitTracker: 'https://fittrack-miguel.vercel.app',
+  jobTracker: 'https://applytrack-board.vercel.app',
+  fitTracker: 'https://fittrack-logbook.vercel.app',
 }
 
 function resolveLiveUrl(envValue: string | undefined, fallback: string): string {
