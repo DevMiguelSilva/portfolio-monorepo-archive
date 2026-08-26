@@ -47,7 +47,7 @@ interface InboxContextValue {
   refreshError: string | null
   newCount: number
   refreshInbox: (options?: RefreshInboxOptions) => Promise<void>
-  /** Hide everything currently in the review list (keeps history for "Seen before"). */
+  /** Hide everything currently in the review list (dismissed permanently). */
   clearReviewList: () => Promise<void>
   approveJob: (id: string) => Promise<string>
   dismissJob: (id: string) => Promise<void>
@@ -270,6 +270,16 @@ export function InboxProvider({ children }: { children: ReactNode }) {
             continue
           }
 
+          // Explicit dismiss (or parked from clear review) — never show again
+          if (existing?.status === 'dismissed') {
+            merged.set(result.externalId, {
+              ...existing,
+              description: result.description || existing.description,
+              fetchedAt: now,
+            })
+            continue
+          }
+
           const jobText = `${result.role}\n${result.description}`
           const match = pickMatch(jobText, search.track ?? 'auto', cvsByTrack)
           const prevMerged = merged.get(result.externalId)
@@ -318,7 +328,7 @@ export function InboxProvider({ children }: { children: ReactNode }) {
       }
 
       // Previous "new" rows that no search returned this round → park as dismissed
-      // (history kept; a later refresh can resurface them as "Seen before").
+      // (history kept permanently — dismissed listings never reappear in review).
       // Only do this when Adzuna actually returned hits, so an empty response can't clear the list.
       const parkNow = new Date().toISOString()
       for (const [externalId, item] of merged) {
@@ -342,7 +352,7 @@ export function InboxProvider({ children }: { children: ReactNode }) {
         )
       } else if (visibleNew === 0) {
         setRefreshError(
-          `Adzuna returned ${apiReturnedIds.size} listing(s), but none are left to review (dismissed history may still resurface next time).`
+          `Adzuna returned ${apiReturnedIds.size} listing(s), but none are left to review (already dismissed or filtered).`
         )
       }
     } catch (err) {

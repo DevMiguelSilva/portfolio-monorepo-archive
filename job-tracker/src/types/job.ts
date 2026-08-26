@@ -88,8 +88,8 @@ export interface InboxJob {
   status: InboxStatus
   savedSearchId: string | null
   /**
-   * How many inbox refreshes have returned this listing.
-   * 1 = first time seen; >1 = matched again (dismissed ones can come back).
+   * How many inbox refreshes have returned this listing while it was still reviewable.
+   * 1 = first time seen; >1 = matched again before dismiss/approve.
    */
   seenCount: number
   fetchedAt: string
