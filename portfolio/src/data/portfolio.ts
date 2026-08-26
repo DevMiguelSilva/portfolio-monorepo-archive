@@ -49,6 +49,7 @@ export const projects: Project[] = [
     ],
     liveUrl: getFitTrackerUrl(),
     githubUrl: 'https://github.com/DevMiguelSilva/Portfolio/tree/main/fit-tracker',
+    featured: true,
     accent: 'orange',
   },
 ]
