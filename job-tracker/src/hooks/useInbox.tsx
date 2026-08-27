@@ -184,7 +184,7 @@ export function InboxProvider({ children }: { children: ReactNode }) {
       }
 
       const approvedExternal = new Set(
-        jobs.filter((j) => j.externalId).map((j) => j.externalId)
+        jobs.filter((j) => j.externalId && !j.deletedAt).map((j) => j.externalId)
       )
 
       const nowPark = new Date().toISOString()
@@ -219,7 +219,8 @@ export function InboxProvider({ children }: { children: ReactNode }) {
 
       /** Every Adzuna hit this refresh (including already-approved), for empty/park guards. */
       const apiReturnedIds = new Set<string>()
-      let skippedApproved = 0
+      const skippedApprovedIds = new Set<string>()
+      const skippedDismissedIds = new Set<string>()
 
       for (const search of active) {
         const legs = expandSearchLocations(search.location)
@@ -259,7 +260,7 @@ export function InboxProvider({ children }: { children: ReactNode }) {
 
           // Already on the board (or approved in inbox) — keep history, don't resurface as new
           if (existing?.status === 'approved' || approvedExternal.has(result.externalId)) {
-            skippedApproved += 1
+            skippedApprovedIds.add(result.externalId)
             if (existing?.status === 'approved') {
               merged.set(result.externalId, {
                 ...existing,
@@ -272,6 +273,7 @@ export function InboxProvider({ children }: { children: ReactNode }) {
 
           // Explicit dismiss (or parked from clear review) — never show again
           if (existing?.status === 'dismissed') {
+            skippedDismissedIds.add(result.externalId)
             merged.set(result.externalId, {
               ...existing,
               description: result.description || existing.description,
@@ -346,14 +348,27 @@ export function InboxProvider({ children }: { children: ReactNode }) {
       await persistAll(next)
 
       const visibleNew = next.filter((i) => i.status === 'new').length
-      if (visibleNew === 0 && skippedApproved > 0) {
-        setRefreshError(
-          `Adzuna returned ${apiReturnedIds.size} listing(s), but all were already approved / on your board — nothing new to review.`
-        )
-      } else if (visibleNew === 0) {
-        setRefreshError(
-          `Adzuna returned ${apiReturnedIds.size} listing(s), but none are left to review (already dismissed or filtered).`
-        )
+      if (visibleNew === 0) {
+        const onBoard = skippedApprovedIds.size
+        const dismissed = skippedDismissedIds.size
+        const total = apiReturnedIds.size
+        if (onBoard > 0 && dismissed === 0) {
+          setRefreshError(
+            `Adzuna returned ${total} listing(s), but all were already approved / on your board — nothing new to review.`
+          )
+        } else if (dismissed > 0 && onBoard === 0) {
+          setRefreshError(
+            `Adzuna returned ${total} listing(s), but all were previously dismissed — nothing new to review.`
+          )
+        } else if (onBoard > 0 && dismissed > 0) {
+          setRefreshError(
+            `Adzuna returned ${total} listing(s): ${onBoard} already on your board, ${dismissed} previously dismissed — nothing new to review.`
+          )
+        } else {
+          setRefreshError(
+            `Adzuna returned ${total} listing(s), but none are left to review.`
+          )
+        }
       }
     } catch (err) {
       setRefreshError(err instanceof Error ? err.message : 'Refresh failed')
