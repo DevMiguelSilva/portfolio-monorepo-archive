@@ -47,7 +47,7 @@ interface InboxContextValue {
   refreshError: string | null
   newCount: number
   refreshInbox: (options?: RefreshInboxOptions) => Promise<void>
-  /** Hide everything currently in the review list (dismissed permanently). */
+  /** Remove current review cards so the next refresh can show them as new again. */
   clearReviewList: () => Promise<void>
   approveJob: (id: string) => Promise<string>
   dismissJob: (id: string) => Promise<void>
@@ -172,10 +172,8 @@ export function InboxProvider({ children }: { children: ReactNode }) {
   )
 
   const clearReviewList = useCallback(async () => {
-    const now = new Date().toISOString()
-    const next = inbox.map((item) =>
-      item.status === 'new' ? { ...item, status: 'dismissed' as const, updatedAt: now } : item
-    )
+    // Drop "new" rows only — do not mark dismissed (that would block Run alone / Refresh).
+    const next = inbox.filter((item) => item.status !== 'new')
     await persistAll(next)
   }, [inbox, persistAll])
 
@@ -339,7 +337,7 @@ export function InboxProvider({ children }: { children: ReactNode }) {
       }
 
       // Previous "new" rows Adzuna did not return this round → remove (not dismiss).
-      // Only user Dismiss / Clear review list permanently blocks resurfacing.
+      // Only explicit Dismiss permanently blocks resurfacing.
       // Only do this when Adzuna actually returned hits, so an empty response can't clear the list.
       for (const [externalId, item] of [...merged.entries()]) {
         if (item.status !== 'new') continue
