@@ -148,12 +148,27 @@ export function InboxProvider({ children }: { children: ReactNode }) {
         setInbox(next)
         return
       }
-      const rows = next.map((item) => inboxJobToRow(item, user.id))
-      const { error } = await supabase.from('job_inbox').upsert(rows)
-      if (error) throw error
+
+      // Drop rows removed from memory (auto-park / clear-review-first), keep dismiss/approve history.
+      const nextIds = new Set(next.map((item) => item.id))
+      const removedIds = inbox.filter((item) => !nextIds.has(item.id)).map((item) => item.id)
+      if (removedIds.length > 0) {
+        const { error: deleteError } = await supabase
+          .from('job_inbox')
+          .delete()
+          .eq('user_id', user.id)
+          .in('id', removedIds)
+        if (deleteError) throw deleteError
+      }
+
+      if (next.length > 0) {
+        const rows = next.map((item) => inboxJobToRow(item, user.id))
+        const { error } = await supabase.from('job_inbox').upsert(rows)
+        if (error) throw error
+      }
       setInbox(next)
     },
-    [isCloudSync, user]
+    [isCloudSync, user, inbox]
   )
 
   const clearReviewList = useCallback(async () => {
@@ -187,21 +202,15 @@ export function InboxProvider({ children }: { children: ReactNode }) {
         jobs.filter((j) => j.externalId && !j.deletedAt).map((j) => j.externalId)
       )
 
-      const nowPark = new Date().toISOString()
-      const startingInbox =
-        options?.clearReviewFirst
-          ? inbox.map((item) =>
-              item.status === 'new'
-                ? { ...item, status: 'dismissed' as const, updatedAt: nowPark }
-                : item
-            )
-          : inbox
+      // Run alone: drop current "new" rows from this refresh's working set (not permanent dismiss).
+      const startingInbox = options?.clearReviewFirst
+        ? inbox.filter((item) => item.status !== 'new')
+        : inbox
 
       const existingByExternal = new Map(startingInbox.map((item) => [item.externalId, item]))
 
       const merged = new Map<string, InboxJob>()
-      // Keep full inbox history so seenCount / dismissed jobs survive when a listing
-      // is missing from one refresh and returns later.
+      // Keep approved/dismissed history; "new" rows may be dropped below if Adzuna no longer returns them.
       for (const item of startingInbox) {
         merged.set(item.externalId, item)
       }
@@ -329,19 +338,14 @@ export function InboxProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      // Previous "new" rows that no search returned this round → park as dismissed
-      // (history kept permanently — dismissed listings never reappear in review).
+      // Previous "new" rows Adzuna did not return this round → remove (not dismiss).
+      // Only user Dismiss / Clear review list permanently blocks resurfacing.
       // Only do this when Adzuna actually returned hits, so an empty response can't clear the list.
-      const parkNow = new Date().toISOString()
-      for (const [externalId, item] of merged) {
+      for (const [externalId, item] of [...merged.entries()]) {
         if (item.status !== 'new') continue
         if (apiReturnedIds.has(externalId)) continue
         if (new Date(item.fetchedAt).getTime() >= refreshStartedMs) continue
-        merged.set(externalId, {
-          ...item,
-          status: 'dismissed',
-          updatedAt: parkNow,
-        })
+        merged.delete(externalId)
       }
 
       const next = [...merged.values()].sort((a, b) => b.matchScore - a.matchScore)
