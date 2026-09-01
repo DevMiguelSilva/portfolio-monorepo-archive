@@ -1,6 +1,11 @@
 import { searchAdzuna } from './adzuna.js'
 import type { ServerEnv } from './env.js'
-import { extractJsonArray, extractJsonObject, generateGeminiText } from './gemini.js'
+import {
+  extractJsonArray,
+  extractJsonObject,
+  generateGeminiLiteText,
+  generateGeminiTailorText,
+} from './gemini.js'
 
 export interface ApiResult {
   status: number
@@ -95,7 +100,7 @@ Rules:
 
 Resume text:
 ${input.resumeText.slice(0, 20000)}`
-      const text = await generateGeminiText(prompt, env, { maxOutputTokens: 8192 })
+      const text = await generateGeminiLiteText(prompt, env, { maxOutputTokens: 8192 })
       return ok({ result: extractJsonObject(text) })
     }
 
@@ -116,7 +121,7 @@ Return ONLY valid JSON with this exact shape (no markdown, no explanation):
 
 Full job posting:
 ${input.description}`
-      const text = await generateGeminiText(prompt, env)
+      const text = await generateGeminiLiteText(prompt, env)
       return ok({ result: extractJsonObject(text) })
     }
 
@@ -143,7 +148,7 @@ Job description excerpt:
 ${String(job.jobDescription || '').slice(0, 2000)}
 
 Write a concise, genuine cover letter (3-4 paragraphs). Mention relevant skills honestly. Do not invent experience the applicant didn't list. Return only the cover letter text, no subject line.`
-      const letter = await generateGeminiText(prompt, env)
+      const letter = await generateGeminiLiteText(prompt, env)
       return ok({ result: letter })
     }
 
@@ -163,7 +168,7 @@ Rules:
 - Start each bullet with a strong action verb
 - Be honest — only reframe existing experience, do not invent jobs or tools
 - Focus on what matches this posting`
-      const text = await generateGeminiText(prompt, env)
+      const text = await generateGeminiLiteText(prompt, env)
       return ok({ result: extractJsonArray<string[]>(text) })
     }
 
@@ -206,7 +211,7 @@ Skills: ${Array.isArray(job.extractedSkills) ? job.extractedSkills.join(', ') : 
 Requirements: ${Array.isArray(job.extractedRequirements) ? job.extractedRequirements.join('; ') : ''}
 Description:
 ${String(job.jobDescription || '').slice(0, 3500)}`
-      const text = await generateGeminiText(prompt, env, { maxOutputTokens: 8192 })
+      const text = await generateGeminiTailorText(prompt, env, { maxOutputTokens: 8192 })
       return ok({ result: extractJsonObject(text) })
     }
 
