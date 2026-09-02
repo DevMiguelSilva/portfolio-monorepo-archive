@@ -11,9 +11,9 @@ import {
 import type { HuntDay } from '../types/portal'
 
 const LEVEL_CLASS: Record<HeatLevel, string> = {
-  // Past empty — subtle fill (not the same as future outlines)
-  0: 'bg-slate-100 dark:bg-track-800',
-  // Clear steps so 1 / 2 / 3+ reads as distinct intensity
+  // Empty past days — visible “dark” square (not invisible)
+  0: 'bg-slate-200 dark:bg-track-900',
+  // Clear steps for 1 / 2 / 3+ applies
   1: 'bg-emerald-200 dark:bg-emerald-900/55',
   2: 'bg-emerald-500 dark:bg-emerald-600',
   3: 'bg-emerald-800 dark:bg-emerald-300',
