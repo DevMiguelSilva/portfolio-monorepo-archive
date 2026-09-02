@@ -14,8 +14,10 @@ import {
   EMPTY_GAP_REPORT,
   lockSkillGroupsToMaster,
   masterCvSearchText,
+  mergeClaimedSkillsIntoGroups,
 } from '../types/cv'
 import type { JobApplication } from '../types/job'
+import { useJobs } from '../hooks/useJobs'
 import { useMasterCv } from '../hooks/useMasterCv'
 import { isMasterCvReadyForAi, masterCvToProfile } from '../lib/cvProfile'
 import { useTailoredDocs } from '../hooks/useTailoredDocs'
@@ -28,7 +30,11 @@ interface TailorPanelProps {
 }
 
 function hasGapContent(gap: GapReport): boolean {
-  return gap.matchedKeywords.length > 0 || gap.missingKeywords.length > 0
+  return (
+    gap.matchedKeywords.length > 0 ||
+    (gap.claimedKeywords?.length ?? 0) > 0 ||
+    gap.missingKeywords.length > 0
+  )
 }
 
 function panelButtonClass(active: boolean, primary = false): string {
@@ -42,7 +48,12 @@ function panelButtonClass(active: boolean, primary = false): string {
     : 'rounded-lg border border-emerald-700 px-3 py-2 text-sm font-medium text-emerald-800 dark:text-emerald-300 disabled:opacity-50'
 }
 
+function skillKey(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
 export function TailorPanel({ job }: TailorPanelProps) {
+  const { updateJob } = useJobs()
   const { getCv, activeTrack } = useMasterCv()
   const track = job.cvTrack ?? activeTrack
   const masterCv = getCv(track)
@@ -54,10 +65,15 @@ export function TailorPanel({ job }: TailorPanelProps) {
   const [error, setError] = useState<string | null>(null)
   const [tailoredCv, setTailoredCv] = useState<MasterCv | null>(existing?.tailoredCv ?? null)
   const [coverLetter, setCoverLetter] = useState(existing?.coverLetter ?? '')
-  const [gapReport, setGapReport] = useState<GapReport>(existing?.gapReport ?? EMPTY_GAP_REPORT)
+  const [gapReport, setGapReport] = useState<GapReport>(() => ({
+    ...EMPTY_GAP_REPORT,
+    ...(existing?.gapReport ?? {}),
+    claimedKeywords: existing?.gapReport?.claimedKeywords ?? [],
+  }))
   /** Panels start collapsed even when saved results exist. */
   const [openPanels, setOpenPanels] = useState<Set<PanelId>>(() => new Set())
 
+  const claimedSkills = job.claimedSkills ?? []
   const showGap = openPanels.has('gap')
   const showTailor = openPanels.has('tailor')
   const showCover = openPanels.has('cover')
@@ -70,6 +86,14 @@ export function TailorPanel({ job }: TailorPanelProps) {
       return next
     })
   }
+
+  const computeGap = (claimed: string[]) =>
+    buildGapReport(
+      job.jobDescription,
+      job.extractedSkills,
+      masterCvSearchText(masterCv),
+      claimed
+    )
 
   const run = async (action: string, fn: () => Promise<void>) => {
     setLoading(action)
@@ -100,43 +124,58 @@ export function TailorPanel({ job }: TailorPanelProps) {
 
   const runGap = () =>
     run('gap', async () => {
-      const gap = buildGapReport(
-        job.jobDescription,
-        job.extractedSkills,
-        masterCvSearchText(masterCv)
-      )
+      const gap = computeGap(claimedSkills)
       setGapReport(gap)
       setPanelOpen('gap', true)
+      await updateJob(job.id, { matchScore: gap.coveragePercent })
       if (tailoredCv) await persist(tailoredCv, coverLetter, gap)
     })
+
+  const toggleClaimedSkill = async (skill: string) => {
+    const key = skillKey(skill)
+    const nextClaimed = claimedSkills.some((s) => skillKey(s) === key)
+      ? claimedSkills.filter((s) => skillKey(s) !== key)
+      : [...claimedSkills, skill]
+    const gap = computeGap(nextClaimed)
+    setGapReport(gap)
+    setPanelOpen('gap', true)
+    try {
+      await updateJob(job.id, {
+        claimedSkills: nextClaimed,
+        matchScore: gap.coveragePercent,
+      })
+      if (tailoredCv) await persist(tailoredCv, coverLetter, gap)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save claimed skill')
+    }
+  }
 
   const runTailor = () =>
     run('tailor', async () => {
       if (!masterCv.contact.name.trim() && !masterCv.summary.trim()) {
         throw new Error('Fill in your Master CV first')
       }
-      const result = await tailorMasterCv(job, masterCv, profile)
+      const jobForAi: JobApplication = { ...job, claimedSkills }
+      const result = await tailorMasterCv(jobForAi, masterCv, profile)
+      const locked = lockSkillGroupsToMaster(masterCv.skills, result.skills)
       const next: MasterCv = {
         ...masterCv,
         headline: result.headline || masterCv.headline,
         summary: result.summary || masterCv.summary,
-        skills: lockSkillGroupsToMaster(masterCv.skills, result.skills),
+        skills: mergeClaimedSkillsIntoGroups(locked, claimedSkills),
         experience: result.experience?.length ? result.experience : masterCv.experience,
         projects: result.projects?.length ? result.projects : masterCv.projects,
         education: masterCv.education,
         certifications: masterCv.certifications ?? [],
         updatedAt: new Date().toISOString(),
       }
-      const gap = buildGapReport(
-        job.jobDescription,
-        job.extractedSkills,
-        masterCvSearchText(masterCv)
-      )
+      const gap = computeGap(claimedSkills)
       const letter = result.coverLetter || coverLetter
       setTailoredCv(next)
       setGapReport(gap)
       if (letter) setCoverLetter(letter)
       setPanelOpen('tailor', true)
+      await updateJob(job.id, { matchScore: gap.coveragePercent })
       await persist(next, letter, gap)
     })
 
@@ -211,6 +250,8 @@ export function TailorPanel({ job }: TailorPanelProps) {
         coverLetter,
       })
     })
+
+  const claimedKeywords = gapReport.claimedKeywords ?? []
 
   return (
     <div className="space-y-4 rounded-xl border border-emerald-200 bg-emerald-50/40 p-5 dark:border-emerald-900 dark:bg-emerald-950/20">
@@ -291,13 +332,29 @@ export function TailorPanel({ job }: TailorPanelProps) {
                 {k}
               </span>
             ))}
-            {gapReport.missingKeywords.map((k) => (
-              <span
-                key={`x-${k}`}
-                className="rounded-md bg-amber-100 px-2 py-0.5 text-xs text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+            {claimedKeywords.map((k) => (
+              <button
+                key={`c-${k}`}
+                type="button"
+                disabled={!!loading}
+                onClick={() => void toggleClaimedSkill(k)}
+                title="Click to unconfirm"
+                className="rounded-md bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-900 ring-1 ring-sky-300/80 dark:bg-sky-950/50 dark:text-sky-200 dark:ring-sky-700 disabled:opacity-50"
               >
-                missing: {k}
-              </span>
+                {k}
+              </button>
+            ))}
+            {gapReport.missingKeywords.map((k) => (
+              <button
+                key={`x-${k}`}
+                type="button"
+                disabled={!!loading}
+                onClick={() => void toggleClaimedSkill(k)}
+                title="Click if you know this skill"
+                className="rounded-md bg-amber-100 px-2 py-0.5 text-xs text-amber-800 ring-1 ring-transparent hover:ring-amber-400 dark:bg-amber-950/40 dark:text-amber-300 disabled:opacity-50"
+              >
+                {k}
+              </button>
             ))}
           </div>
           <ul className="mt-3 space-y-1 text-sm text-slate-600 dark:text-slate-300">

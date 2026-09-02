@@ -128,6 +128,8 @@ export interface MasterCvLibrary {
 export interface GapReport {
   coveragePercent: number
   matchedKeywords: string[]
+  /** Missing on Master CV but user confirmed for this job (shown blue). */
+  claimedKeywords: string[]
   missingKeywords: string[]
   suggestions: string[]
 }
@@ -370,6 +372,42 @@ export function lockSkillGroupsToMaster(
   })
 }
 
+/** Prepend user-confirmed skills onto the first skill group (or create one). */
+export function mergeClaimedSkillsIntoGroups(
+  groups: CvSkillGroup[],
+  claimed: string[]
+): CvSkillGroup[] {
+  const toAdd = uniqueTrimmedSkills(claimed)
+  if (toAdd.length === 0) return groups.map((g) => ({ ...g, items: [...g.items] }))
+
+  if (groups.length === 0) {
+    return [{ id: crypto.randomUUID(), group: 'Skills', items: toAdd }]
+  }
+
+  const existing = new Set(
+    groups.flatMap((g) => g.items.map((item) => normalizeSkillLabel(item))).filter(Boolean)
+  )
+  const fresh = toAdd.filter((s) => !existing.has(normalizeSkillLabel(s)))
+  if (fresh.length === 0) return groups.map((g) => ({ ...g, items: [...g.items] }))
+
+  return groups.map((g, i) =>
+    i === 0 ? { ...g, items: [...fresh, ...g.items] } : { ...g, items: [...g.items] }
+  )
+}
+
+function uniqueTrimmedSkills(skills: string[]): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const raw of skills) {
+    const value = raw.trim()
+    const key = normalizeSkillLabel(value)
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    out.push(value)
+  }
+  return out
+}
+
 /** Full master CV text used for honest JD coverage (summary + skills + bullets). */
 export function masterCvSearchText(cv: MasterCv): string {
   const parts = [
@@ -400,6 +438,7 @@ export function isMasterCvSparse(cv: MasterCv): boolean {
 export const EMPTY_GAP_REPORT: GapReport = {
   coveragePercent: 0,
   matchedKeywords: [],
+  claimedKeywords: [],
   missingKeywords: [],
   suggestions: [],
 }

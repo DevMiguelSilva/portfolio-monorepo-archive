@@ -74,7 +74,8 @@ export function JobDetailPage() {
   const selectedTrack = job.cvTrack ?? activeTrack
   const showInterviewPrep = job.status === 'interview'
   const hasUrl = Boolean(job.jobUrl.trim())
-  const selectedScore = dual?.[selectedTrack].score ?? job.matchScore
+  // Prefer stored score (includes user-claimed gap skills) over raw CV-only dual score.
+  const selectedScore = job.matchScore ?? dual?.[selectedTrack].score ?? null
   const jdIncomplete = !job.jdComplete
 
   const applyTrack = async (track: CvTrack) => {

@@ -20,6 +20,11 @@ export interface JobApplication {
   jdSummary: string
   extractedSkills: string[]
   extractedRequirements: string[]
+  /**
+   * Gap-check skills the user confirmed they know (were "missing" on Master CV).
+   * Used for coverage % and included when tailoring the resume for this job.
+   */
+  claimedSkills: string[]
   source: string
   externalId: string
   matchScore: number | null
@@ -154,6 +159,7 @@ export function createEmptyJob(overrides: Partial<JobApplication> = {}): JobAppl
     jdSummary: '',
     extractedSkills: [],
     extractedRequirements: [],
+    claimedSkills: [],
     source: 'indeed',
     externalId: '',
     matchScore: null,

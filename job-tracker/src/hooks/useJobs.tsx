@@ -53,6 +53,7 @@ function normalizeJob(job: JobApplication): JobApplication {
     jdSummary: job.jdSummary ?? '',
     extractedSkills: job.extractedSkills ?? [],
     extractedRequirements: job.extractedRequirements ?? [],
+    claimedSkills: job.claimedSkills ?? [],
     jdComplete: resolveJdComplete({
       jdComplete: job.jdComplete,
       source: job.source ?? 'manual',

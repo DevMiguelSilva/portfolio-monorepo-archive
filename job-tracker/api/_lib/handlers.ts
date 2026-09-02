@@ -67,6 +67,7 @@ export async function handleGemini(body: unknown, env: ServerEnv): Promise<ApiRe
       job?: Record<string, unknown>
       profile?: Record<string, unknown>
       masterCv?: Record<string, unknown>
+      claimedSkills?: string[]
     }
 
     if (!input.action) return fail(400, 'action is required')
@@ -174,6 +175,17 @@ Rules:
 
     if (input.action === 'tailorCv') {
       if (!input.masterCv) return fail(400, 'masterCv is required')
+      const claimedSkills = Array.isArray(input.claimedSkills)
+        ? input.claimedSkills.map((s) => String(s).trim()).filter(Boolean)
+        : Array.isArray((input.job as { claimedSkills?: unknown } | undefined)?.claimedSkills)
+          ? ((input.job as { claimedSkills: unknown[] }).claimedSkills || [])
+              .map((s) => String(s).trim())
+              .filter(Boolean)
+          : []
+      const claimedBlock =
+        claimedSkills.length > 0
+          ? `\nCandidate-confirmed skills (user selected from gap check — they know these even if not on Master CV):\n${claimedSkills.join(', ')}\n`
+          : ''
       const prompt = `You tailor resumes for ATS screening in Canada (Workday/Greenhouse/Lever-style parsers).
 Rewrite the candidate's master CV for ONE job so keyword overlap is honest and scannable.
 
@@ -185,9 +197,9 @@ Hard rules:
 
 ATS-friendly content rules:
 - Headline: match the target role family (e.g. Front-End / React OR Power Platform) using words from the JD only if they fit real experience
-- Summary: 3-4 sentences max; weave in high-priority JD keywords the candidate truly has
-- Skills: Keep the EXACT same skill groups as the Master CV (same id and group label, same number of groups — do not rename, merge, split, or invent groups). Only reorder items within each group toward the JD; demote less relevant skills to the end of their group. Do not add skills not already listed on the Master CV. Use exact common spellings from the JD when equivalent (e.g. Power Apps vs PowerApps)
-- Experience bullets: max 5 bullets per role; start with strong verbs; include real metrics when already present; mirror JD keywords naturally in bullets where true
+- Summary: 3-4 sentences max; weave in high-priority JD keywords the candidate truly has (including Candidate-confirmed skills)
+- Skills: Keep the EXACT same skill groups as the Master CV (same id and group label, same number of groups — do not rename, merge, split, or invent groups). Only reorder items within each group toward the JD; demote less relevant skills to the end of their group. You MAY add Candidate-confirmed skills into the most relevant existing group (prefer the first group) even if they were not on the Master CV. Do not add any other skills not on the Master CV or in Candidate-confirmed skills. Use exact common spellings from the JD when equivalent (e.g. Power Apps vs PowerApps)
+- Experience bullets: max 5 bullets per role; start with strong verbs; include real metrics when already present; mirror JD keywords and Candidate-confirmed skills naturally in bullets where true
 - Prefer one-page density: concise bullets, no filler
 
 Return ONLY valid JSON with this shape:
@@ -202,7 +214,7 @@ Return ONLY valid JSON with this shape:
 
 Master CV JSON:
 ${JSON.stringify(input.masterCv)}
-
+${claimedBlock}
 Target job:
 Company: ${job.company || ''}
 Role: ${job.role || ''}

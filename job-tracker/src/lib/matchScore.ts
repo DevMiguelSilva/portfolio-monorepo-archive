@@ -282,10 +282,12 @@ export function scoreJobMatch(
 export function buildGapReport(
   jobDescription: string,
   extractedSkills: string[],
-  cvTextOrSkills: string | string[]
+  cvTextOrSkills: string | string[],
+  claimedSkills: string[] = []
 ): {
   coveragePercent: number
   matchedKeywords: string[]
+  claimedKeywords: string[]
   missingKeywords: string[]
   suggestions: string[]
 } {
@@ -296,26 +298,54 @@ export function buildGapReport(
     return {
       coveragePercent: 0,
       matchedKeywords: [],
+      claimedKeywords: [],
       missingKeywords: [],
       suggestions: ['Parse the job posting to extract skills for a better gap report.'],
     }
   }
 
+  const claimedKeys = new Set(
+    claimedSkills.map((s) => s.trim().toLowerCase().replace(/\s+/g, ' ')).filter(Boolean)
+  )
+  const isClaimed = (skill: string) => {
+    const key = skill.trim().toLowerCase().replace(/\s+/g, ' ')
+    if (claimedKeys.has(key)) return true
+    return claimedSkills.some(
+      (c) => textHasSkill(c, skill) || textHasSkill(skill, c)
+    )
+  }
+
+  const matchedKeywords = result.matched
+  const claimedKeywords = result.missing.filter(isClaimed)
+  const missingKeywords = result.missing.filter((s) => !isClaimed(s))
+  const coveragePercent = Math.round(
+    ((matchedKeywords.length + claimedKeywords.length) / result.targets.length) * 100
+  )
+
   const suggestions = [
-    result.score >= 70
+    coveragePercent >= 70
       ? 'Strong overlap with this JD — worth applying with light keyword polish.'
-      : result.score >= 45
+      : coveragePercent >= 45
         ? 'Partial overlap — apply if the missing items are real experience you can phrase honestly.'
         : 'Weak overlap — consider skipping unless you truly have the missing stack.',
-    ...result.missing
+    ...(claimedKeywords.length > 0
+      ? [
+          `You confirmed ${claimedKeywords.length} skill(s) for this job — they’ll be included when you tailor.`,
+        ]
+      : []),
+    ...missingKeywords
       .slice(0, 5)
-      .map((k) => `Not found in this master CV: "${k}". Only add it if you have real experience.`),
+      .map(
+        (k) =>
+          `Not found in this master CV: "${k}". Click it if you know it, then tailor.`
+      ),
   ]
 
   return {
-    coveragePercent: result.score,
-    matchedKeywords: result.matched,
-    missingKeywords: result.missing,
+    coveragePercent,
+    matchedKeywords,
+    claimedKeywords,
+    missingKeywords,
     suggestions,
   }
 }

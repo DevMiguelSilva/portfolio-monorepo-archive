@@ -25,6 +25,7 @@ create table if not exists job_applications (
   jd_summary text not null default '',
   extracted_skills jsonb not null default '[]'::jsonb,
   extracted_requirements jsonb not null default '[]'::jsonb,
+  claimed_skills jsonb not null default '[]'::jsonb,
   source text not null default 'manual',
   external_id text not null default '',
   match_score integer,
@@ -47,6 +48,11 @@ alter table job_applications alter column jd_complete set default true;
 update job_applications set jd_complete = true where jd_complete is null;
 alter table job_applications alter column jd_complete set not null;
 alter table job_applications add column if not exists deleted_at timestamptz;
+alter table job_applications add column if not exists claimed_skills jsonb;
+update job_applications set claimed_skills = '[]'::jsonb where claimed_skills is null;
+alter table job_applications alter column claimed_skills set default '[]'::jsonb;
+update job_applications set claimed_skills = '[]'::jsonb where claimed_skills is null;
+alter table job_applications alter column claimed_skills set not null;
 
 create table if not exists saved_searches (
   id uuid primary key default gen_random_uuid(),

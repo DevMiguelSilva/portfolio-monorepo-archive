@@ -19,6 +19,7 @@ export interface JobRow {
   jd_summary?: string
   extracted_skills: string[]
   extracted_requirements: string[]
+  claimed_skills?: string[] | null
   source?: string
   external_id?: string
   match_score?: number | null
@@ -125,6 +126,7 @@ export function rowToJob(row: JobRow): JobApplication {
     jdSummary: row.jd_summary ?? '',
     extractedSkills: row.extracted_skills ?? [],
     extractedRequirements: row.extracted_requirements ?? [],
+    claimedSkills: row.claimed_skills ?? [],
     source: row.source ?? 'manual',
     externalId: row.external_id ?? '',
     matchScore: row.match_score ?? null,
@@ -155,6 +157,7 @@ export function jobToRow(job: JobApplication, userId: string): Omit<JobRow, 'cre
     jd_summary: job.jdSummary,
     extracted_skills: job.extractedSkills,
     extracted_requirements: job.extractedRequirements,
+    claimed_skills: job.claimedSkills ?? [],
     source: job.source,
     external_id: job.externalId,
     match_score: job.matchScore,
@@ -286,7 +289,11 @@ export function rowToTailoredDocument(row: TailoredDocumentRow): TailoredDocumen
     masterCvSnapshot: row.master_cv_snapshot,
     tailoredCv: row.tailored_cv,
     coverLetter: row.cover_letter ?? '',
-    gapReport: row.gap_report ?? EMPTY_GAP_REPORT,
+    gapReport: {
+      ...EMPTY_GAP_REPORT,
+      ...(row.gap_report ?? {}),
+      claimedKeywords: row.gap_report?.claimedKeywords ?? [],
+    },
     matchScore: row.match_score,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

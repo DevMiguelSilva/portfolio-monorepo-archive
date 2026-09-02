@@ -32,6 +32,7 @@ export async function tailorMasterCv(
     job,
     profile,
     masterCv,
+    claimedSkills: job.claimedSkills ?? [],
   })
 }
 
