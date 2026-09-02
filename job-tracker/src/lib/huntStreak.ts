@@ -86,22 +86,23 @@ export function buildHeatmapCellsFromLevel(
 }
 
 /**
- * Full calendar year through the week that contains today (auto-updates each year).
- * Starts on the Sunday of the week that contains Jan 1.
+ * Full calendar year: Jan (week of Jan 1) through Dec (week of Dec 31).
+ * Days after today are marked isFuture so they render as empty outlines, not "missed".
  */
 export function buildYearHeatmapCellsFromLevel(
   levelForDate: (date: string) => HeatLevel,
   today = new Date()
 ): HeatCell[] {
-  const end = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12, 0, 0, 0)
+  const todayNoon = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12, 0, 0, 0)
   const jan1 = new Date(today.getFullYear(), 0, 1, 12, 0, 0, 0)
   const start = new Date(jan1)
   start.setDate(jan1.getDate() - jan1.getDay())
 
-  const thisSunday = new Date(end)
-  thisSunday.setDate(thisSunday.getDate() - thisSunday.getDay())
+  const dec31 = new Date(today.getFullYear(), 11, 31, 12, 0, 0, 0)
+  const endSunday = new Date(dec31)
+  endSunday.setDate(dec31.getDate() - dec31.getDay())
 
-  return buildHeatmapRange(start, thisSunday, end, levelForDate)
+  return buildHeatmapRange(start, endSunday, todayNoon, levelForDate)
 }
 
 function buildHeatmapRange(

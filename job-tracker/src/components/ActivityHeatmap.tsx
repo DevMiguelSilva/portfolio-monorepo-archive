@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { applyCountToLevel } from '../lib/applyStreak'
 import {
   buildHeatmapCells,
@@ -11,11 +11,16 @@ import {
 import type { HuntDay } from '../types/portal'
 
 const LEVEL_CLASS: Record<HeatLevel, string> = {
-  0: 'bg-slate-100 dark:bg-track-900',
-  1: 'bg-emerald-200 dark:bg-emerald-900/50',
-  2: 'bg-emerald-500 dark:bg-emerald-500',
-  3: 'bg-emerald-700 dark:bg-emerald-400',
+  // Past empty — subtle fill (not the same as future outlines)
+  0: 'bg-slate-100 dark:bg-track-800',
+  // Clear steps so 1 / 2 / 3+ reads as distinct intensity
+  1: 'bg-emerald-200 dark:bg-emerald-900/55',
+  2: 'bg-emerald-500 dark:bg-emerald-600',
+  3: 'bg-emerald-800 dark:bg-emerald-300',
 }
+
+const FUTURE_CLASS =
+  'border border-dashed border-slate-300/90 bg-transparent dark:border-track-600 dark:bg-transparent'
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -23,7 +28,7 @@ interface PortalHeatmapProps {
   variant: 'portal'
   daysByDate: Map<string, HuntDay>
   activeFeedIds: string[]
-  /** Default: full calendar year through today. */
+  /** Default: full calendar year (future weeks as empty outlines). */
   mode?: 'year' | 'rolling'
   weeks?: number
 }
@@ -41,6 +46,7 @@ export function ActivityHeatmap(props: ActivityHeatmapProps) {
   const mode = props.mode ?? 'year'
   const weeks = props.weeks ?? 26
   const year = new Date().getFullYear()
+  const todayWeekRef = useRef<HTMLDivElement>(null)
 
   const cells = useMemo(() => {
     if (props.variant === 'portal') {
@@ -87,6 +93,22 @@ export function ActivityHeatmap(props: ActivityHeatmapProps) {
     return [...map.entries()].sort((a, b) => a[0] - b[0])
   }, [cells])
 
+  const todayWeekIndex = useMemo(() => {
+    let best = -1
+    for (const cell of cells) {
+      if (!cell.isFuture) best = cell.weekIndex
+    }
+    return best
+  }, [cells])
+
+  useEffect(() => {
+    todayWeekRef.current?.scrollIntoView({
+      inline: 'center',
+      block: 'nearest',
+      behavior: 'instant',
+    })
+  }, [todayWeekIndex, cells.length])
+
   return (
     <div className="space-y-3">
       {mode === 'year' && (
@@ -102,15 +124,17 @@ export function ActivityHeatmap(props: ActivityHeatmapProps) {
         </div>
         <div className="flex gap-1">
           {byWeek.map(([weekIndex, weekCells]) => (
-            <div key={weekIndex} className="flex flex-col gap-1">
+            <div
+              key={weekIndex}
+              ref={weekIndex === todayWeekIndex ? todayWeekRef : undefined}
+              className="flex flex-col gap-1"
+            >
               {weekCells.map((cell) => (
                 <div
                   key={cell.date}
                   title={titleFor(cell)}
                   className={`h-3 w-3 rounded-sm ${
-                    cell.isFuture
-                      ? 'border border-dashed border-slate-200 bg-transparent dark:border-track-700'
-                      : LEVEL_CLASS[cell.level]
+                    cell.isFuture ? FUTURE_CLASS : LEVEL_CLASS[cell.level]
                   }`}
                 />
               ))}
