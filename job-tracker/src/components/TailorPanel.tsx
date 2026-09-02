@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { generateCoverLetter, tailorMasterCv } from '../api/gemini'
+import { tailorMasterCv } from '../api/gemini'
 import {
   downloadApplicationPack,
   downloadCoverLetterDocx,
@@ -19,7 +19,7 @@ import {
 import type { JobApplication } from '../types/job'
 import { useJobs } from '../hooks/useJobs'
 import { useMasterCv } from '../hooks/useMasterCv'
-import { isMasterCvReadyForAi, masterCvToProfile } from '../lib/cvProfile'
+import { masterCvToProfile } from '../lib/cvProfile'
 import { useTailoredDocs } from '../hooks/useTailoredDocs'
 import { LoadingSpinner } from './LoadingSpinner'
 
@@ -170,24 +170,17 @@ export function TailorPanel({ job }: TailorPanelProps) {
         updatedAt: new Date().toISOString(),
       }
       const gap = computeGap(claimedSkills)
-      const letter = result.coverLetter || coverLetter
+      const letter = (result.coverLetter || '').trim()
+      if (!letter) {
+        throw new Error('Tailor did not return a cover letter — try Re-run.')
+      }
       setTailoredCv(next)
       setGapReport(gap)
-      if (letter) setCoverLetter(letter)
+      setCoverLetter(letter)
       setPanelOpen('tailor', true)
+      setPanelOpen('cover', true)
       await updateJob(job.id, { matchScore: gap.coveragePercent })
       await persist(next, letter, gap)
-    })
-
-  const runCover = () =>
-    run('cover', async () => {
-      if (!isMasterCvReadyForAi(masterCv)) {
-        throw new Error('Fill in your Master CV first (name + summary or experience)')
-      }
-      const letter = await generateCoverLetter(job, profile)
-      setCoverLetter(letter)
-      setPanelOpen('cover', true)
-      if (tailoredCv) await persist(tailoredCv, letter, gapReport)
     })
 
   /** Toggle open/closed when result exists; first click runs generation. */
@@ -212,7 +205,7 @@ export function TailorPanel({ job }: TailorPanelProps) {
   const onCoverClick = () => {
     if (loading) return
     if (!coverLetter.trim()) {
-      void runCover()
+      setError('Tailor the resume first — cover letter is created with it.')
       return
     }
     setPanelOpen('cover', !showCover)
@@ -262,8 +255,8 @@ export function TailorPanel({ job }: TailorPanelProps) {
           <span className="font-medium text-slate-700 dark:text-slate-200">
             {CV_TRACK_LABELS[track]}
           </span>{' '}
-          master CV. Tailor first, then download from the preview. Click a result button again to
-          hide it; use Re-run for a new version.
+          master CV. Tailor creates the resume and cover letter together. Click a result button
+          again to hide it; Re-run updates both.
         </p>
       </div>
 
@@ -282,15 +275,20 @@ export function TailorPanel({ job }: TailorPanelProps) {
           onClick={onTailorClick}
           className={panelButtonClass(showTailor, true)}
         >
-          {loading === 'tailor' ? 'Tailoring…' : 'Tailor from master CV'}
+          {loading === 'tailor' ? 'Tailoring…' : 'Tailor resume + cover letter'}
         </button>
         <button
           type="button"
-          disabled={!!loading}
+          disabled={!!loading || !coverLetter.trim()}
           onClick={onCoverClick}
           className={panelButtonClass(showCover)}
+          title={
+            coverLetter.trim()
+              ? 'Show or hide the cover letter from tailor'
+              : 'Created automatically when you tailor'
+          }
         >
-          {loading === 'cover' ? 'Writing…' : 'Cover letter'}
+          Cover letter
         </button>
       </div>
 
@@ -376,7 +374,7 @@ export function TailorPanel({ job }: TailorPanelProps) {
                 className="text-xs font-medium text-track-accent hover:underline disabled:opacity-50"
                 onClick={() => void runTailor()}
               >
-                Re-run new version
+                Re-run resume + cover letter
               </button>
               <button
                 type="button"
@@ -444,9 +442,9 @@ export function TailorPanel({ job }: TailorPanelProps) {
                 type="button"
                 disabled={!!loading}
                 className="text-xs font-medium text-track-accent hover:underline disabled:opacity-50"
-                onClick={() => void runCover()}
+                onClick={() => void runTailor()}
               >
-                Re-run
+                Re-run with resume
               </button>
               <button
                 type="button"

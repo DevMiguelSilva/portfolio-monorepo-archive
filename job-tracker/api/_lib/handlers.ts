@@ -201,6 +201,7 @@ ATS-friendly content rules:
 - Skills: Keep the EXACT same skill groups as the Master CV (same id and group label, same number of groups — do not rename, merge, split, or invent groups). Only reorder items within each group toward the JD; demote less relevant skills to the end of their group. You MAY add Candidate-confirmed skills into the most relevant existing group (prefer the first group) even if they were not on the Master CV. Do not add any other skills not on the Master CV or in Candidate-confirmed skills. Use exact common spellings from the JD when equivalent (e.g. Power Apps vs PowerApps)
 - Experience bullets: max 5 bullets per role; start with strong verbs; include real metrics when already present; mirror JD keywords and Candidate-confirmed skills naturally in bullets where true
 - Prefer one-page density: concise bullets, no filler
+- coverLetter (REQUIRED): Write a complete, ready-to-send cover letter body (3-4 paragraphs). Use the candidate's real name from the Master CV contact. Address the company/role naturally. Do NOT include letterhead blocks, mailing address lines, phone placeholders, "[Your Address]", "[Date]", "[Hiring Manager]", or any fill-in-the-blank labels. Start with a greeting (e.g. Dear Hiring Manager,) then the body, then a short closing with the candidate's name. No subject line.
 
 Return ONLY valid JSON with this shape:
 {
@@ -209,7 +210,7 @@ Return ONLY valid JSON with this shape:
   "skills": [{"id":"","group":"","items":[""]}],
   "experience": [{"id":"","company":"","title":"","location":"","start":"","end":"","current":true,"bullets":[{"id":"","text":"","tags":[]}]}],
   "projects": [{"id":"","name":"","url":"","bullets":[{"id":"","text":"","tags":[]}]}],
-  "coverLetter": "optional short cover letter text"
+  "coverLetter": "required complete cover letter body text"
 }
 
 Master CV JSON:
