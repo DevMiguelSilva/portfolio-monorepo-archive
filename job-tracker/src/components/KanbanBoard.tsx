@@ -80,7 +80,7 @@ export function KanbanBoard({
               </div>
             </div>
             <div
-              className={`max-h-[23rem] min-h-[7rem] space-y-2 overflow-y-auto rounded-lg pr-0.5 transition ${
+              className={`max-h-[40rem] min-h-[7rem] space-y-2 overflow-y-auto rounded-lg pr-0.5 transition ${
                 isTarget ? 'bg-track-accent/5 ring-2 ring-inset ring-track-accent/30' : ''
               }`}
             >
@@ -129,7 +129,7 @@ export function KanbanBoard({
               )}
             </div>
           </div>
-          <div className="max-h-[23rem] min-h-[7rem] space-y-2 overflow-y-auto pr-0.5">
+          <div className="max-h-[40rem] min-h-[7rem] space-y-2 overflow-y-auto pr-0.5">
             {trashedJobs.length === 0 ? (
               <p className="rounded-lg border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400 dark:border-track-700">
                 No deleted jobs
