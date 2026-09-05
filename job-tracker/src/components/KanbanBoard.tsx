@@ -40,114 +40,116 @@ export function KanbanBoard({
   }
 
   return (
-    <div className="flex gap-4 overflow-x-auto pb-4">
-      {columns.map((status) => {
-        const config = STATUS_CONFIG[status]
-        const columnJobs = jobs.filter((job) => job.status === status)
-        const isTarget = dropTarget === status && draggedId != null
+    <div className="app-scroll max-h-[40rem] overflow-auto rounded-xl border border-slate-200 bg-slate-50/50 p-3 dark:border-track-700 dark:bg-track-900/40">
+      <div className="flex min-w-min gap-4">
+        {columns.map((status) => {
+          const config = STATUS_CONFIG[status]
+          const columnJobs = jobs.filter((job) => job.status === status)
+          const isTarget = dropTarget === status && draggedId != null
 
-        return (
-          <div
-            key={status}
-            className="min-w-[260px] flex-1"
-            onDragOver={(e) => {
-              e.preventDefault()
-              e.dataTransfer.dropEffect = 'move'
-              setDropTarget(status)
-            }}
-            onDragLeave={() => {
-              setDropTarget((current) => (current === status ? null : current))
-            }}
-            onDrop={() => handleDrop(status)}
-          >
+          return (
             <div
-              className={`mb-3 flex items-center justify-between rounded-lg border px-3 py-2 ${config.bg} ${config.border}`}
+              key={status}
+              className="min-w-[260px] flex-1"
+              onDragOver={(e) => {
+                e.preventDefault()
+                e.dataTransfer.dropEffect = 'move'
+                setDropTarget(status)
+              }}
+              onDragLeave={() => {
+                setDropTarget((current) => (current === status ? null : current))
+              }}
+              onDrop={() => handleDrop(status)}
             >
-              <h2 className={`text-sm font-semibold ${config.color}`}>{config.label}</h2>
+              <div
+                className={`sticky top-0 z-10 mb-3 flex items-center justify-between rounded-lg border px-3 py-2 backdrop-blur-sm ${config.bg} ${config.border}`}
+              >
+                <h2 className={`text-sm font-semibold ${config.color}`}>{config.label}</h2>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-white/60 px-2 py-0.5 text-xs font-bold dark:bg-black/20">
+                    {columnJobs.length}
+                  </span>
+                  {status === 'rejected' && onHideRejected && (
+                    <button
+                      type="button"
+                      onClick={onHideRejected}
+                      className="text-xs font-medium text-red-600/80 hover:underline dark:text-red-400"
+                    >
+                      Hide
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div
+                className={`min-h-[7rem] space-y-2 rounded-lg transition ${
+                  isTarget ? 'bg-track-accent/5 ring-2 ring-inset ring-track-accent/30' : ''
+                }`}
+              >
+                {columnJobs.length === 0 ? (
+                  <p className="rounded-lg border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400 dark:border-track-700">
+                    Drop jobs here
+                  </p>
+                ) : (
+                  columnJobs.map((job) => (
+                    <JobCard
+                      key={job.id}
+                      job={job}
+                      isDragging={draggedId === job.id}
+                      onDragStart={(id, event) => {
+                        setDraggedId(id)
+                        attachCardDragGhost(event)
+                      }}
+                      onDragEnd={() => {
+                        setDraggedId(null)
+                        setDropTarget(null)
+                      }}
+                    />
+                  ))
+                )}
+              </div>
+            </div>
+          )
+        })}
+
+        {showTrash && (
+          <div className="min-w-[260px] flex-1">
+            <div className="sticky top-0 z-10 mb-3 flex items-center justify-between rounded-lg border border-slate-300 bg-slate-100/95 px-3 py-2 backdrop-blur-sm dark:border-track-600 dark:bg-track-900/95">
+              <h2 className="text-sm font-semibold text-slate-600 dark:text-slate-300">Trash</h2>
               <div className="flex items-center gap-2">
                 <span className="rounded-full bg-white/60 px-2 py-0.5 text-xs font-bold dark:bg-black/20">
-                  {columnJobs.length}
+                  {trashedJobs.length}
                 </span>
-                {status === 'rejected' && onHideRejected && (
+                {onHideTrash && (
                   <button
                     type="button"
-                    onClick={onHideRejected}
-                    className="text-xs font-medium text-red-600/80 hover:underline dark:text-red-400"
+                    onClick={onHideTrash}
+                    className="text-xs font-medium text-slate-500 hover:underline"
                   >
                     Hide
                   </button>
                 )}
               </div>
             </div>
-            <div
-              className={`max-h-[40rem] min-h-[7rem] space-y-2 overflow-y-auto rounded-lg pr-0.5 transition ${
-                isTarget ? 'bg-track-accent/5 ring-2 ring-inset ring-track-accent/30' : ''
-              }`}
-            >
-              {columnJobs.length === 0 ? (
+            <div className="min-h-[7rem] space-y-2">
+              {trashedJobs.length === 0 ? (
                 <p className="rounded-lg border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400 dark:border-track-700">
-                  Drop jobs here
+                  No deleted jobs
                 </p>
               ) : (
-                columnJobs.map((job) => (
+                trashedJobs.map((job) => (
                   <JobCard
                     key={job.id}
                     job={job}
-                    isDragging={draggedId === job.id}
-                    onDragStart={(id, event) => {
-                      setDraggedId(id)
-                      attachCardDragGhost(event)
-                    }}
-                    onDragEnd={() => {
-                      setDraggedId(null)
-                      setDropTarget(null)
-                    }}
+                    trashMode
+                    onRestore={onRestoreJob}
+                    onPurge={onPurgeJob}
                   />
                 ))
               )}
             </div>
           </div>
-        )
-      })}
-
-      {showTrash && (
-        <div className="min-w-[260px] flex-1">
-          <div className="mb-3 flex items-center justify-between rounded-lg border border-slate-300 bg-slate-100 px-3 py-2 dark:border-track-600 dark:bg-track-900">
-            <h2 className="text-sm font-semibold text-slate-600 dark:text-slate-300">Trash</h2>
-            <div className="flex items-center gap-2">
-              <span className="rounded-full bg-white/60 px-2 py-0.5 text-xs font-bold dark:bg-black/20">
-                {trashedJobs.length}
-              </span>
-              {onHideTrash && (
-                <button
-                  type="button"
-                  onClick={onHideTrash}
-                  className="text-xs font-medium text-slate-500 hover:underline"
-                >
-                  Hide
-                </button>
-              )}
-            </div>
-          </div>
-          <div className="max-h-[40rem] min-h-[7rem] space-y-2 overflow-y-auto pr-0.5">
-            {trashedJobs.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400 dark:border-track-700">
-                No deleted jobs
-              </p>
-            ) : (
-              trashedJobs.map((job) => (
-                <JobCard
-                  key={job.id}
-                  job={job}
-                  trashMode
-                  onRestore={onRestoreJob}
-                  onPurge={onPurgeJob}
-                />
-              ))
-            )}
-          </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }

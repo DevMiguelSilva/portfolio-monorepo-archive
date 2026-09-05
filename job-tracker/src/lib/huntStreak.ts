@@ -86,7 +86,7 @@ export function buildHeatmapCellsFromLevel(
 }
 
 /**
- * Full calendar year through the week that contains today (auto-updates each year).
+ * Full calendar year through the week after today (current week + next week).
  * Starts on the Sunday of the week that contains Jan 1.
  */
 export function buildYearHeatmapCellsFromLevel(
@@ -100,8 +100,11 @@ export function buildYearHeatmapCellsFromLevel(
 
   const thisSunday = new Date(end)
   thisSunday.setDate(thisSunday.getDate() - thisSunday.getDay())
+  // Include one full week after the current week (future days as outlines).
+  const endSunday = new Date(thisSunday)
+  endSunday.setDate(thisSunday.getDate() + 7)
 
-  return buildHeatmapRange(start, thisSunday, end, levelForDate)
+  return buildHeatmapRange(start, endSunday, end, levelForDate)
 }
 
 function buildHeatmapRange(

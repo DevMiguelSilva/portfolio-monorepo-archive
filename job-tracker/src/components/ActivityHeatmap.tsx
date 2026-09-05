@@ -114,7 +114,7 @@ export function ActivityHeatmap(props: ActivityHeatmapProps) {
       {mode === 'year' && (
         <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{year}</p>
       )}
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      <div className="app-scroll flex gap-2 overflow-x-auto pb-1">
         <div className="flex flex-col justify-between py-1 text-[10px] text-slate-400">
           {WEEKDAYS.map((d, i) => (
             <span key={d} className={i % 2 === 1 ? 'invisible' : ''}>
