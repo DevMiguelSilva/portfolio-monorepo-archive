@@ -331,13 +331,13 @@ export function InboxPage() {
                   </div>
                 ) : (
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex min-w-0 flex-1 items-start gap-2">
+                    <div className="flex min-w-0 flex-1 items-center gap-2">
                       <button
                         type="button"
                         draggable
                         onDragStart={(e) => handleSearchDragStart(index, e)}
                         onDragEnd={handleSearchDragEnd}
-                        className="mt-0.5 cursor-grab select-none px-0.5 text-slate-400 active:cursor-grabbing"
+                        className="flex h-8 w-6 shrink-0 cursor-grab select-none items-center justify-center leading-none text-slate-400 active:cursor-grabbing"
                         title="Drag to reorder"
                         aria-label={`Reorder ${search.label.trim() || search.query}`}
                       >

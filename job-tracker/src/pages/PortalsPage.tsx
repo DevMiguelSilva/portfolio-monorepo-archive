@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type DragEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { ActivityHeatmap } from '../components/ActivityHeatmap'
 import { LoadingSpinner } from '../components/LoadingSpinner'
@@ -32,6 +32,7 @@ export function PortalsPage() {
     addFeed,
     updateFeed,
     deleteFeed,
+    reorderFeeds,
     toggleCheckedToday,
     openFeed,
     openAllActive,
@@ -47,6 +48,8 @@ export function PortalsPage() {
   })
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [dragIndex, setDragIndex] = useState<number | null>(null)
+  const [dropIndex, setDropIndex] = useState<number | null>(null)
 
   const activeIds = useMemo(() => activeFeeds.map((f) => f.id), [activeFeeds])
   const yearComplete = useMemo(
@@ -101,6 +104,39 @@ export function PortalsPage() {
     } else {
       setMessage(`Opened ${opened} portal(s) and marked them checked for today.`)
     }
+  }
+
+  const handleFeedDragStart = (index: number, event: DragEvent<HTMLElement>) => {
+    setDragIndex(index)
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', String(index))
+  }
+
+  const handleFeedDragOver = (index: number, event: DragEvent<HTMLElement>) => {
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+    if (dropIndex !== index) setDropIndex(index)
+  }
+
+  const handleFeedDrop = async (index: number) => {
+    if (dragIndex == null || dragIndex === index) {
+      setDragIndex(null)
+      setDropIndex(null)
+      return
+    }
+    try {
+      await reorderFeeds(dragIndex, index)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to reorder feeds')
+    } finally {
+      setDragIndex(null)
+      setDropIndex(null)
+    }
+  }
+
+  const handleFeedDragEnd = () => {
+    setDragIndex(null)
+    setDropIndex(null)
   }
 
   if (loading) return <LoadingSpinner label="Loading portals…" />
@@ -203,12 +239,20 @@ export function PortalsPage() {
           </p>
         ) : (
           <ul className="space-y-3">
-            {feeds.map((feed) => {
+            {feeds.map((feed, index) => {
               const checked = todayCheckedIds.has(feed.id)
               return (
                 <li
                   key={feed.id}
-                  className="rounded-lg border border-slate-200 p-3 dark:border-track-700"
+                  onDragOver={(e) => handleFeedDragOver(index, e)}
+                  onDrop={() => void handleFeedDrop(index)}
+                  className={`rounded-lg border border-slate-200 p-3 dark:border-track-700 ${
+                    dragIndex === index ? 'opacity-40' : ''
+                  } ${
+                    dropIndex === index && dragIndex != null && dragIndex !== index
+                      ? 'ring-2 ring-track-accent/40'
+                      : ''
+                  }`}
                 >
                   {editingId === feed.id ? (
                     <div className="space-y-2.5">
@@ -232,7 +276,18 @@ export function PortalsPage() {
                     </div>
                   ) : (
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="flex min-w-0 flex-1 items-center gap-3">
+                      <div className="flex min-w-0 flex-1 items-center gap-2">
+                        <button
+                          type="button"
+                          draggable
+                          onDragStart={(e) => handleFeedDragStart(index, e)}
+                          onDragEnd={handleFeedDragEnd}
+                          className="flex h-8 w-6 shrink-0 cursor-grab select-none items-center justify-center leading-none text-slate-400 active:cursor-grabbing"
+                          title="Drag to reorder"
+                          aria-label={`Reorder ${feed.name}`}
+                        >
+                          ⋮⋮
+                        </button>
                         <input
                           type="checkbox"
                           checked={checked}

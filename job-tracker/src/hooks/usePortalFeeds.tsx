@@ -42,6 +42,8 @@ interface PortalFeedsContextValue {
   addFeed: (input: { name: string; url: string; source?: PortalSource }) => Promise<void>
   updateFeed: (id: string, updates: Partial<PortalFeed>) => Promise<void>
   deleteFeed: (id: string) => Promise<void>
+  /** Persist a new order after drag-and-drop (fromIndex → toIndex). */
+  reorderFeeds: (fromIndex: number, toIndex: number) => Promise<void>
   toggleCheckedToday: (feedId: string) => Promise<void>
   markCheckedToday: (feedIds: string[]) => Promise<void>
   openFeed: (feed: PortalFeed, markChecked?: boolean) => Promise<void>
@@ -50,10 +52,18 @@ interface PortalFeedsContextValue {
 
 const PortalFeedsContext = createContext<PortalFeedsContextValue | null>(null)
 
+function sortFeeds(feeds: PortalFeed[]): PortalFeed[] {
+  const sorted = [...feeds].sort((a, b) => {
+    if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder
+    return a.createdAt.localeCompare(b.createdAt)
+  })
+  return sorted.map((f, i) => (f.sortOrder === i ? f : { ...f, sortOrder: i }))
+}
+
 function readFeeds(): PortalFeed[] {
   try {
     const raw = localStorage.getItem(FEEDS_KEY)
-    return raw ? (JSON.parse(raw) as PortalFeed[]) : []
+    return raw ? sortFeeds(JSON.parse(raw) as PortalFeed[]) : []
   } catch {
     return []
   }
@@ -106,16 +116,18 @@ export function PortalFeedsProvider({ children }: { children: ReactNode }) {
       if (daysRes.error) throw daysRes.error
 
       setFeeds(
-        (feedsRes.data ?? []).map((row) => ({
-          id: row.id,
-          name: row.name,
-          url: row.url,
-          source: row.source,
-          active: row.active,
-          sortOrder: row.sort_order,
-          createdAt: row.created_at,
-          updatedAt: row.updated_at,
-        }))
+        sortFeeds(
+          (feedsRes.data ?? []).map((row) => ({
+            id: row.id,
+            name: row.name,
+            url: row.url,
+            source: row.source,
+            active: row.active,
+            sortOrder: row.sort_order ?? 0,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+          }))
+        )
       )
       setHuntDays(
         (daysRes.data ?? []).map((row) => ({
@@ -139,12 +151,13 @@ export function PortalFeedsProvider({ children }: { children: ReactNode }) {
 
   const persistFeeds = useCallback(
     async (next: PortalFeed[]) => {
-      setFeeds(next)
+      const ordered = sortFeeds(next)
+      setFeeds(ordered)
       if (!isCloudSync || !supabase || !user) {
-        writeFeeds(next)
+        writeFeeds(ordered)
         return
       }
-      const rows = next.map((f) => ({
+      const rows = ordered.map((f) => ({
         id: f.id,
         user_id: user.id,
         name: f.name,
@@ -209,12 +222,32 @@ export function PortalFeedsProvider({ children }: { children: ReactNode }) {
       if (isCloudSync && supabase) {
         const { error } = await supabase.from('portal_feeds').delete().eq('id', id)
         if (error) throw error
-        setFeeds((prev) => prev.filter((f) => f.id !== id))
+        setFeeds((prev) => sortFeeds(prev.filter((f) => f.id !== id)))
       } else {
         await persistFeeds(feeds.filter((f) => f.id !== id))
       }
     },
     [feeds, isCloudSync, persistFeeds]
+  )
+
+  const reorderFeeds = useCallback(
+    async (fromIndex: number, toIndex: number) => {
+      if (
+        fromIndex === toIndex ||
+        fromIndex < 0 ||
+        toIndex < 0 ||
+        fromIndex >= feeds.length ||
+        toIndex >= feeds.length
+      ) {
+        return
+      }
+      const now = new Date().toISOString()
+      const next = [...feeds]
+      const [moved] = next.splice(fromIndex, 1)
+      next.splice(toIndex, 0, moved)
+      await persistFeeds(next.map((f, i) => ({ ...f, sortOrder: i, updatedAt: now })))
+    },
+    [feeds, persistFeeds]
   )
 
   const upsertToday = useCallback(
@@ -311,6 +344,7 @@ export function PortalFeedsProvider({ children }: { children: ReactNode }) {
       addFeed,
       updateFeed,
       deleteFeed,
+      reorderFeeds,
       toggleCheckedToday,
       markCheckedToday,
       openFeed,
@@ -331,6 +365,7 @@ export function PortalFeedsProvider({ children }: { children: ReactNode }) {
       addFeed,
       updateFeed,
       deleteFeed,
+      reorderFeeds,
       toggleCheckedToday,
       markCheckedToday,
       openFeed,
