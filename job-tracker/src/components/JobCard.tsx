@@ -95,9 +95,14 @@ export function JobCard({
   )
 }
 
-/** Off-screen clone of the card so the browser doesn’t show a URL chip. */
-export function attachCardDragGhost(event: DragEvent<HTMLElement>): void {
-  const source = event.currentTarget
+/**
+ * Off-screen clone so the browser shows a real card preview (not a URL chip / handle).
+ * Pass `source` when the drag starts from a child handle but the whole row should be cloned.
+ */
+export function attachCardDragGhost(
+  event: DragEvent<HTMLElement>,
+  source: HTMLElement = event.currentTarget
+): void {
   const rect = source.getBoundingClientRect()
   const ghost = source.cloneNode(true) as HTMLElement
   ghost.style.width = `${rect.width}px`
@@ -116,7 +121,9 @@ export function attachCardDragGhost(event: DragEvent<HTMLElement>): void {
   const offsetY = Math.min(Math.max(event.clientY - rect.top, 12), rect.height - 12)
   event.dataTransfer.setDragImage(ghost, offsetX, offsetY)
   event.dataTransfer.effectAllowed = 'move'
-  event.dataTransfer.setData('text/plain', 'job-card')
+  if (![...event.dataTransfer.types].includes('text/plain')) {
+    event.dataTransfer.setData('text/plain', 'drag-card')
+  }
 
   requestAnimationFrame(() => {
     requestAnimationFrame(() => ghost.remove())

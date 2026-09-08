@@ -1,6 +1,7 @@
 import { useMemo, useState, type DragEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { ActivityHeatmap } from '../components/ActivityHeatmap'
+import { attachCardDragGhost } from '../components/JobCard'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { usePortalFeeds } from '../hooks/usePortalFeeds'
 import {
@@ -110,6 +111,8 @@ export function PortalsPage() {
     setDragIndex(index)
     event.dataTransfer.effectAllowed = 'move'
     event.dataTransfer.setData('text/plain', String(index))
+    const card = event.currentTarget.closest('li')
+    if (card instanceof HTMLElement) attachCardDragGhost(event, card)
   }
 
   const handleFeedDragOver = (index: number, event: DragEvent<HTMLElement>) => {

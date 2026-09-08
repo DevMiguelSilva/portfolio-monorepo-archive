@@ -1,5 +1,6 @@
 import { useMemo, useState, type DragEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { attachCardDragGhost } from '../components/JobCard'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { SourceBadge } from '../components/SourceBadge'
 import { useInbox } from '../hooks/useInbox'
@@ -101,6 +102,8 @@ export function InboxPage() {
     setDragIndex(index)
     event.dataTransfer.effectAllowed = 'move'
     event.dataTransfer.setData('text/plain', String(index))
+    const card = event.currentTarget.closest('li')
+    if (card instanceof HTMLElement) attachCardDragGhost(event, card)
   }
 
   const handleSearchDragOver = (index: number, event: DragEvent<HTMLElement>) => {
