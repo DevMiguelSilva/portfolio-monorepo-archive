@@ -1,12 +1,6 @@
 import { useState } from 'react'
 import { tailorMasterCv } from '../api/gemini'
-import {
-  downloadApplicationPack,
-  downloadCoverLetterDocx,
-  downloadCvDocx,
-  openCvPrintWindow,
-  tailoredDocFilename,
-} from '../lib/docxExport'
+import { downloadApplicationPack, openCvPrintWindow } from '../lib/docxExport'
 import { buildGapReport } from '../lib/matchScore'
 import type { GapReport, MasterCv, TailoredDocument } from '../types/cv'
 import {
@@ -211,26 +205,10 @@ export function TailorPanel({ job }: TailorPanelProps) {
     setPanelOpen('cover', !showCover)
   }
 
-  const handleDocx = () =>
-    run('docx', async () => {
-      if (!tailoredCv) throw new Error('Tailor the resume first before downloading')
-      await downloadCvDocx(tailoredCv, tailoredDocFilename(tailoredCv.contact.name))
-    })
-
   const handlePrint = () =>
     run('print', async () => {
       if (!tailoredCv) throw new Error('Tailor the resume first before printing')
       openCvPrintWindow(tailoredCv, `${job.company} — ${job.role}`)
-    })
-
-  const handleCoverDocx = () =>
-    run('coverDocx', async () => {
-      if (!coverLetter.trim()) throw new Error('Generate a cover letter first')
-      await downloadCoverLetterDocx(coverLetter, {
-        company: job.company,
-        role: job.role,
-        candidateName: masterCv.contact.name,
-      })
     })
 
   const handleApplicationPack = () =>
@@ -256,7 +234,7 @@ export function TailorPanel({ job }: TailorPanelProps) {
             {CV_TRACK_LABELS[track]}
           </span>{' '}
           master CV. Tailor creates the resume and cover letter together. Click a result button
-          again to hide it; Re-run updates both.
+          again to hide it; Re-run on the tailored preview updates both.
         </p>
       </div>
 
@@ -374,7 +352,7 @@ export function TailorPanel({ job }: TailorPanelProps) {
                 className="text-xs font-medium text-track-accent hover:underline disabled:opacity-50"
                 onClick={() => void runTailor()}
               >
-                Re-run resume + cover letter
+                Re-run
               </button>
               <button
                 type="button"
@@ -400,27 +378,19 @@ export function TailorPanel({ job }: TailorPanelProps) {
             <button
               type="button"
               disabled={!!loading}
-              onClick={handleDocx}
+              onClick={handleApplicationPack}
               className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-800 disabled:opacity-50"
+              title="ZIP folder with resume and cover letter"
             >
-              {loading === 'docx' ? 'Preparing…' : 'Download resume'}
+              {loading === 'pack' ? 'Packing…' : 'Download application folder'}
             </button>
             <button
               type="button"
               disabled={!!loading}
               onClick={handlePrint}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-track-700"
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-track-700 disabled:opacity-50"
             >
-              Print / PDF
-            </button>
-            <button
-              type="button"
-              disabled={!!loading}
-              onClick={handleApplicationPack}
-              className="rounded-lg border border-emerald-700 px-3 py-2 text-sm font-medium text-emerald-800 dark:text-emerald-300 disabled:opacity-50"
-              title="ZIP folder with resume (+ cover letter if generated)"
-            >
-              {loading === 'pack' ? 'Packing…' : 'Download application folder'}
+              {loading === 'print' ? 'Opening…' : 'Print / PDF'}
             </button>
           </div>
         </div>
@@ -440,14 +410,6 @@ export function TailorPanel({ job }: TailorPanelProps) {
               </button>
               <button
                 type="button"
-                disabled={!!loading}
-                className="text-xs font-medium text-track-accent hover:underline disabled:opacity-50"
-                onClick={() => void runTailor()}
-              >
-                Re-run with resume
-              </button>
-              <button
-                type="button"
                 className="text-xs text-slate-500 hover:underline"
                 onClick={() => setPanelOpen('cover', false)}
               >
@@ -458,16 +420,6 @@ export function TailorPanel({ job }: TailorPanelProps) {
           <p className="whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-300">
             {coverLetter}
           </p>
-          <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-3 dark:border-track-700">
-            <button
-              type="button"
-              disabled={!!loading}
-              onClick={handleCoverDocx}
-              className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-800 disabled:opacity-50"
-            >
-              {loading === 'coverDocx' ? 'Preparing…' : 'Download cover letter'}
-            </button>
-          </div>
         </div>
       )}
     </div>

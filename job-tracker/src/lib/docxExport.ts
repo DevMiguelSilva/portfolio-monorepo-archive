@@ -686,12 +686,25 @@ export function openCvPrintWindow(cv: MasterCv, title: string): void {
       ${certHtml ? `<h2>Certifications</h2>${certHtml}` : ''}
     </body></html>`
 
-  const win = window.open('', '_blank', 'noopener,noreferrer,width=900,height=1000')
+  // Do not use noopener here — browsers return null and print never runs.
+  const win = window.open('', '_blank', 'width=900,height=1000')
   if (!win) throw new Error('Pop-up blocked — allow pop-ups to print/PDF')
+  try {
+    win.opener = null
+  } catch {
+    /* ignore */
+  }
+  win.document.open()
   win.document.write(html)
   win.document.close()
   win.focus()
-  setTimeout(() => win.print(), 250)
+  setTimeout(() => {
+    try {
+      win.print()
+    } catch {
+      /* ignore */
+    }
+  }, 250)
 }
 
 function escapeHtml(value: string): string {
