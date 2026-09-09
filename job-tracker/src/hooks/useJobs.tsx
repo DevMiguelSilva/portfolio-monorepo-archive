@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import { resolveAppliedDate } from '../lib/appliedDate'
 import { jobToRow, rowToJob } from '../lib/database'
 import { supabase } from '../lib/supabase'
 import type { JobApplication, JobStatus } from '../types/job'
@@ -39,23 +40,15 @@ interface JobsContextValue {
 
 const JobsContext = createContext<JobsContextValue | null>(null)
 
-/** Calendar apply date in local time; future UTC-skew dates clamp to today. */
-function resolveAppliedDate(status: JobStatus, appliedDate: string | undefined): string {
-  if (status === 'saved') return ''
-  const today = localDateKey()
-  const d = (appliedDate ?? '').trim().slice(0, 10)
-  if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d) || d > today) return today
-  return d
-}
-
 function normalizeJob(job: JobApplication): JobApplication {
   const status = job.status ?? 'saved'
+  const updatedAt = job.updatedAt ?? createEmptyJob().updatedAt
   return {
     ...createEmptyJob(),
     ...job,
     status,
     // Saved jobs are not applications — drop stale applied dates from undo moves
-    appliedDate: resolveAppliedDate(status, job.appliedDate),
+    appliedDate: resolveAppliedDate(status, job.appliedDate, updatedAt),
     source: job.source ?? 'manual',
     externalId: job.externalId ?? '',
     matchScore: job.matchScore ?? null,
@@ -128,7 +121,7 @@ export function JobsProvider({ children }: { children: ReactNode }) {
       }
 
       const normalized = cloudJobs.map(normalizeJob)
-      // Persist UTC-skew repairs (appliedDate was "tomorrow" in local time)
+      // Persist applied-date repairs (UTC evening skew → wrong calendar day)
       if (supabase && user) {
         const repairs = normalized.filter((job, i) => {
           const raw = cloudJobs[i]
@@ -228,12 +221,16 @@ export function JobsProvider({ children }: { children: ReactNode }) {
     async (id: string, status: JobStatus) => {
       const job = jobs.find((j) => j.id === id)
       if (!job || job.deletedAt) return
-      // Saved = not an application for streak. Applied/interview/offer/rejected keep or set date.
-      // Use local calendar date (not UTC) so evening applies still count as "today".
-      await updateJob(id, {
-        status,
-        appliedDate: resolveAppliedDate(status, job.appliedDate || localDateKey()),
-      })
+      let appliedDate = ''
+      if (status !== 'saved') {
+        const existing = job.appliedDate?.trim().slice(0, 10)
+        if (existing && /^\d{4}-\d{2}-\d{2}$/.test(existing)) {
+          appliedDate = resolveAppliedDate(status, existing, job.updatedAt)
+        } else {
+          appliedDate = localDateKey()
+        }
+      }
+      await updateJob(id, { status, appliedDate })
     },
     [jobs, updateJob]
   )
