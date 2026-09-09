@@ -39,6 +39,15 @@ interface JobsContextValue {
 
 const JobsContext = createContext<JobsContextValue | null>(null)
 
+/** Calendar apply date in local time; future UTC-skew dates clamp to today. */
+function resolveAppliedDate(status: JobStatus, appliedDate: string | undefined): string {
+  if (status === 'saved') return ''
+  const today = localDateKey()
+  const d = (appliedDate ?? '').trim().slice(0, 10)
+  if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d) || d > today) return today
+  return d
+}
+
 function normalizeJob(job: JobApplication): JobApplication {
   const status = job.status ?? 'saved'
   return {
@@ -46,7 +55,7 @@ function normalizeJob(job: JobApplication): JobApplication {
     ...job,
     status,
     // Saved jobs are not applications — drop stale applied dates from undo moves
-    appliedDate: status === 'saved' ? '' : (job.appliedDate ?? ''),
+    appliedDate: resolveAppliedDate(status, job.appliedDate),
     source: job.source ?? 'manual',
     externalId: job.externalId ?? '',
     matchScore: job.matchScore ?? null,
@@ -67,7 +76,12 @@ function readLocalJobs(): JobApplication[] {
   try {
     const stored = localStorage.getItem(LOCAL_STORAGE_KEY)
     if (!stored) return []
-    return (JSON.parse(stored) as JobApplication[]).map(normalizeJob)
+    const raw = JSON.parse(stored) as JobApplication[]
+    const normalized = raw.map(normalizeJob)
+    if (normalized.some((job, i) => job.appliedDate !== (raw[i]?.appliedDate ?? ''))) {
+      writeLocalJobs(normalized)
+    }
+    return normalized
   } catch {
     return []
   }
@@ -113,7 +127,22 @@ export function JobsProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      setJobs(cloudJobs.map(normalizeJob))
+      const normalized = cloudJobs.map(normalizeJob)
+      // Persist UTC-skew repairs (appliedDate was "tomorrow" in local time)
+      if (supabase && user) {
+        const repairs = normalized.filter((job, i) => {
+          const raw = cloudJobs[i]
+          return raw && job.appliedDate !== (raw.appliedDate ?? '')
+        })
+        if (repairs.length > 0) {
+          const rows = repairs.map((job) => ({
+            ...jobToRow(job, user.id),
+            updated_at: new Date().toISOString(),
+          }))
+          void supabase.from('job_applications').upsert(rows)
+        }
+      }
+      setJobs(normalized)
     } catch (err) {
       console.error('Failed to load jobs:', err)
       setJobs(readLocalJobs())
@@ -201,10 +230,9 @@ export function JobsProvider({ children }: { children: ReactNode }) {
       if (!job || job.deletedAt) return
       // Saved = not an application for streak. Applied/interview/offer/rejected keep or set date.
       // Use local calendar date (not UTC) so evening applies still count as "today".
-      const countsAsApply = status !== 'saved'
       await updateJob(id, {
         status,
-        appliedDate: countsAsApply ? job.appliedDate || localDateKey() : '',
+        appliedDate: resolveAppliedDate(status, job.appliedDate || localDateKey()),
       })
     },
     [jobs, updateJob]
