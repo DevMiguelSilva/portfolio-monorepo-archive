@@ -54,8 +54,8 @@ export function PortalsPage() {
 
   const activeIds = useMemo(() => activeFeeds.map((f) => f.id), [activeFeeds])
   const yearComplete = useMemo(
-    () => countCompleteDaysInYear(daysByDate, activeIds, new Date().getFullYear()),
-    [daysByDate, activeIds]
+    () => countCompleteDaysInYear(daysByDate, activeFeeds, new Date().getFullYear()),
+    [daysByDate, activeFeeds]
   )
 
   const handleAdd = async (e: React.FormEvent) => {
@@ -228,7 +228,7 @@ export function PortalsPage() {
           <ActivityHeatmap
             variant="portal"
             daysByDate={daysByDate}
-            activeFeedIds={activeIds}
+            activeFeeds={activeFeeds}
             mode="year"
           />
         )}

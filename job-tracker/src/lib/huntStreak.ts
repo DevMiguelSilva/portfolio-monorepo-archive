@@ -3,11 +3,26 @@ import { localDateKey } from '../types/portal'
 
 export type HeatLevel = 0 | 1 | 2 | 3
 
+/** Minimal feed shape for streak / heatmap completeness. */
+export type StreakFeed = { id: string; createdAt: string }
+
+/**
+ * Feeds that count for a calendar day — only those that already existed then.
+ * Newly added URLs must not rewrite past complete days into partial/missed.
+ */
+export function feedIdsRequiredOnDate(feeds: StreakFeed[], date: string): string[] {
+  return feeds
+    .filter((f) => localDateKey(new Date(f.createdAt)) <= date)
+    .map((f) => f.id)
+}
+
 /** 0 none · 1 partial · 2 all feeds · 3 all feeds + bonus (reserved) */
 export function dayHeatLevel(
   day: HuntDay | undefined,
-  activeFeedIds: string[]
+  feeds: StreakFeed[],
+  date: string
 ): HeatLevel {
+  const activeFeedIds = feedIdsRequiredOnDate(feeds, date)
   if (!day || day.checkedFeedIds.length === 0 || activeFeedIds.length === 0) return 0
   const checked = new Set(day.checkedFeedIds)
   const hit = activeFeedIds.filter((id) => checked.has(id)).length
@@ -16,28 +31,32 @@ export function dayHeatLevel(
   return 1
 }
 
-export function isDayComplete(day: HuntDay | undefined, activeFeedIds: string[]): boolean {
-  return dayHeatLevel(day, activeFeedIds) >= 2
+export function isDayComplete(
+  day: HuntDay | undefined,
+  feeds: StreakFeed[],
+  date: string
+): boolean {
+  return dayHeatLevel(day, feeds, date) >= 2
 }
 
 /** Consecutive complete days ending today (or yesterday if today incomplete). */
 export function computeStreak(
   daysByDate: Map<string, HuntDay>,
-  activeFeedIds: string[],
+  feeds: StreakFeed[],
   today = localDateKey()
 ): number {
-  if (activeFeedIds.length === 0) return 0
+  if (feeds.length === 0) return 0
 
   let cursor = new Date(`${today}T12:00:00`)
   // If today isn't complete yet, streak can still count through yesterday
-  if (!isDayComplete(daysByDate.get(today), activeFeedIds)) {
+  if (!isDayComplete(daysByDate.get(today), feeds, today)) {
     cursor.setDate(cursor.getDate() - 1)
   }
 
   let streak = 0
   for (let i = 0; i < 400; i++) {
     const key = localDateKey(cursor)
-    if (!isDayComplete(daysByDate.get(key), activeFeedIds)) break
+    if (!isDayComplete(daysByDate.get(key), feeds, key)) break
     streak += 1
     cursor.setDate(cursor.getDate() - 1)
   }
@@ -51,10 +70,14 @@ export function computeStreak(
 export function buildHeatmapCells(
   weeks: number,
   daysByDate: Map<string, HuntDay>,
-  activeFeedIds: string[],
+  feeds: StreakFeed[],
   today = new Date()
 ): HeatCell[] {
-  return buildHeatmapCellsFromLevel(weeks, (date) => dayHeatLevel(daysByDate.get(date), activeFeedIds), today)
+  return buildHeatmapCellsFromLevel(
+    weeks,
+    (date) => dayHeatLevel(daysByDate.get(date), feeds, date),
+    today
+  )
 }
 
 export type HeatCell = {
@@ -141,13 +164,13 @@ function buildHeatmapRange(
 
 export function countCompleteDaysInYear(
   daysByDate: Map<string, HuntDay>,
-  activeFeedIds: string[],
+  feeds: StreakFeed[],
   year: number
 ): number {
   let n = 0
   for (const [date, day] of daysByDate) {
     if (!date.startsWith(String(year))) continue
-    if (isDayComplete(day, activeFeedIds)) n += 1
+    if (isDayComplete(day, feeds, date)) n += 1
   }
   return n
 }

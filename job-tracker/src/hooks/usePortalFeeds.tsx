@@ -320,12 +320,12 @@ export function PortalFeedsProvider({ children }: { children: ReactNode }) {
     () => new Set(todayDay?.checkedFeedIds ?? []),
     [todayDay]
   )
-  const todayComplete = isDayComplete(todayDay, activeIds)
-  const todayLevel = dayHeatLevel(todayDay, activeIds)
+  const todayComplete = isDayComplete(todayDay, activeFeeds, todayKey)
+  const todayLevel = dayHeatLevel(todayDay, activeFeeds, todayKey)
   const checkedTodayCount = activeIds.filter((id) => todayCheckedIds.has(id)).length
   const streak = useMemo(
-    () => computeStreak(daysByDate, activeIds, todayKey),
-    [daysByDate, activeIds, todayKey]
+    () => computeStreak(daysByDate, activeFeeds, todayKey),
+    [daysByDate, activeFeeds, todayKey]
   )
 
   const value = useMemo(

@@ -9,6 +9,7 @@ import {
   type HeatLevel,
 } from '../lib/huntStreak'
 import type { HuntDay } from '../types/portal'
+import type { StreakFeed } from '../lib/huntStreak'
 
 const LEVEL_CLASS: Record<HeatLevel, string> = {
   // Empty past days — visible “dark” square (not invisible)
@@ -27,7 +28,8 @@ const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 interface PortalHeatmapProps {
   variant: 'portal'
   daysByDate: Map<string, HuntDay>
-  activeFeedIds: string[]
+  /** Active feeds with createdAt — past days only require feeds that existed then. */
+  activeFeeds: StreakFeed[]
   /** Default: full calendar year (future weeks as empty outlines). */
   mode?: 'year' | 'rolling'
   weeks?: number
@@ -52,10 +54,10 @@ export function ActivityHeatmap(props: ActivityHeatmapProps) {
     if (props.variant === 'portal') {
       if (mode === 'year') {
         return buildYearHeatmapCellsFromLevel((date) =>
-          dayHeatLevel(props.daysByDate.get(date), props.activeFeedIds)
+          dayHeatLevel(props.daysByDate.get(date), props.activeFeeds, date)
         )
       }
-      return buildHeatmapCells(weeks, props.daysByDate, props.activeFeedIds)
+      return buildHeatmapCells(weeks, props.daysByDate, props.activeFeeds)
     }
     const levelFor = (date: string) => applyCountToLevel(props.countsByDate.get(date) ?? 0)
     if (mode === 'year') return buildYearHeatmapCellsFromLevel(levelFor)
@@ -70,7 +72,7 @@ export function ActivityHeatmap(props: ActivityHeatmapProps) {
   const titleFor = (cell: HeatCell) => {
     if (cell.isFuture) return `${cell.date}: Upcoming`
     if (props.variant === 'portal') {
-      const level = dayHeatLevel(props.daysByDate.get(cell.date), props.activeFeedIds)
+      const level = dayHeatLevel(props.daysByDate.get(cell.date), props.activeFeeds, cell.date)
       return `${cell.date}: ${
         level === 0
           ? 'No check-in'
