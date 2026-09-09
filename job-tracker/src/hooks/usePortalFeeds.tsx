@@ -47,7 +47,7 @@ interface PortalFeedsContextValue {
   toggleCheckedToday: (feedId: string) => Promise<void>
   markCheckedToday: (feedIds: string[]) => Promise<void>
   openFeed: (feed: PortalFeed, markChecked?: boolean) => Promise<void>
-  openAllActive: () => Promise<{ opened: number; blockedHint: boolean }>
+  openAllActive: () => Promise<{ opened: number; blockedHint: boolean; remaining: number }>
 }
 
 const PortalFeedsContext = createContext<PortalFeedsContextValue | null>(null)
@@ -290,7 +290,13 @@ export function PortalFeedsProvider({ children }: { children: ReactNode }) {
 
   const openFeed = useCallback(
     async (feed: PortalFeed, markChecked = true) => {
-      window.open(feed.url, '_blank', 'noopener,noreferrer')
+      const win = window.open(feed.url, '_blank')
+      if (!win) return
+      try {
+        win.opener = null
+      } catch {
+        /* ignore */
+      }
       if (markChecked && feed.active) await markCheckedToday([feed.id])
     },
     [markCheckedToday]
@@ -298,14 +304,54 @@ export function PortalFeedsProvider({ children }: { children: ReactNode }) {
 
   const openAllActive = useCallback(async () => {
     const active = feeds.filter((f) => f.active && f.url.trim())
-    let opened = 0
-    for (const feed of active) {
-      const win = window.open(feed.url, '_blank', 'noopener,noreferrer')
-      if (win) opened += 1
+    const already = new Set(
+      huntDays.find((d) => d.date === todayKey)?.checkedFeedIds ?? []
+    )
+    // Unchecked first so each click advances the list when the browser blocks extras.
+    const targets = [
+      ...active.filter((f) => !already.has(f.id)),
+      ...active.filter((f) => already.has(f.id)),
+    ]
+    if (targets.length === 0) {
+      return { opened: 0, blockedHint: false, remaining: 0 }
     }
-    if (active.length > 0) await markCheckedToday(active.map((f) => f.id))
-    return { opened, blockedHint: opened < active.length }
-  }, [feeds, markCheckedToday])
+
+    // Open blank tabs in one synchronous gesture (browsers often allow several),
+    // then navigate — more reliable than window.open(url) in a loop.
+    const slots = targets.map((feed) => ({
+      feed,
+      win: window.open('about:blank', '_blank'),
+    }))
+
+    const openedIds: string[] = []
+    for (const { feed, win } of slots) {
+      if (!win) continue
+      try {
+        win.opener = null
+        win.location.href = feed.url
+        openedIds.push(feed.id)
+      } catch {
+        try {
+          win.close()
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+
+    if (openedIds.length > 0) await markCheckedToday(openedIds)
+
+    const openedSet = new Set(openedIds)
+    const remaining = active.filter(
+      (f) => !already.has(f.id) && !openedSet.has(f.id)
+    ).length
+
+    return {
+      opened: openedIds.length,
+      blockedHint: openedIds.length < targets.length,
+      remaining,
+    }
+  }, [feeds, huntDays, todayKey, markCheckedToday])
 
   const activeFeeds = useMemo(() => feeds.filter((f) => f.active), [feeds])
   const activeIds = useMemo(() => activeFeeds.map((f) => f.id), [activeFeeds])

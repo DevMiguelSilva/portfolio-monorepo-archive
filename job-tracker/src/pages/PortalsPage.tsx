@@ -97,14 +97,24 @@ export function PortalsPage() {
   const handleOpenAll = async () => {
     setError(null)
     setMessage(null)
-    const { opened, blockedHint } = await openAllActive()
-    if (blockedHint) {
+    const { opened, blockedHint, remaining } = await openAllActive()
+    if (opened === 0) {
       setMessage(
-        `Opened ${opened} tab(s). Allow pop-ups for this site to open the rest, or open them one by one.`
+        'Browser blocked the tabs. Allow pop-ups for this site, then try again.'
       )
-    } else {
-      setMessage(`Opened ${opened} portal(s) and marked them checked for today.`)
+      return
     }
+    if (blockedHint || remaining > 0) {
+      setMessage(
+        `Opened ${opened} and marked those checked.${
+          remaining > 0
+            ? ` ${remaining} still unchecked — click Open all again (or allow pop-ups to open more at once).`
+            : ' Allow pop-ups if you want every tab in one click.'
+        }`
+      )
+      return
+    }
+    setMessage(`Opened ${opened} portal(s) and marked them checked for today.`)
   }
 
   const handleFeedDragStart = (index: number, event: DragEvent<HTMLElement>) => {
