@@ -11,6 +11,7 @@ import { jobToRow, rowToJob } from '../lib/database'
 import { supabase } from '../lib/supabase'
 import type { JobApplication, JobStatus } from '../types/job'
 import { createEmptyJob, resolveJdComplete } from '../types/job'
+import { localDateKey } from '../types/portal'
 import { useAuth } from './useAuth'
 
 const LOCAL_STORAGE_KEY = 'job-tracker-applications'
@@ -199,11 +200,11 @@ export function JobsProvider({ children }: { children: ReactNode }) {
       const job = jobs.find((j) => j.id === id)
       if (!job || job.deletedAt) return
       // Saved = not an application for streak. Applied/interview/offer/rejected keep or set date.
+      // Use local calendar date (not UTC) so evening applies still count as "today".
       const countsAsApply = status !== 'saved'
-      const today = new Date().toISOString().slice(0, 10)
       await updateJob(id, {
         status,
-        appliedDate: countsAsApply ? job.appliedDate || today : '',
+        appliedDate: countsAsApply ? job.appliedDate || localDateKey() : '',
       })
     },
     [jobs, updateJob]
