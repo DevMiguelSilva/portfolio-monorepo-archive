@@ -405,7 +405,7 @@ export function InboxProvider({ children }: { children: ReactNode }) {
       const item = inbox.find((i) => i.id === id)
       if (!item) throw new Error('Inbox item not found')
 
-      const track = item.matchedTrack ?? 'frontend'
+      const track = item.matchedTrack ?? 'powerPlatform'
 
       // Same job shape as manual add: keep full description text; AI fills summary/skills when possible.
       let jdSummary = ''
@@ -448,6 +448,7 @@ export function InboxProvider({ children }: { children: ReactNode }) {
         notes: `Approved from inbox (${item.source}). Match ${coverage.score}% · ${CV_TRACK_LABELS[track]}.`,
         source: item.source,
         externalId: item.externalId,
+        savedSearchId: item.savedSearchId,
         matchScore: coverage.score,
         cvTrack: track,
         // API listings are usually snippets — paste full JD on Job Detail to complete.

@@ -205,7 +205,7 @@ export function scoreMasterCvAgainstJob(
   )
 }
 
-/** Score both tracks; bestTrack is the higher coverage (ties → frontend). */
+/** Score both tracks; bestTrack prefers Power Platform when scores tie. */
 export function scoreDualTracks(
   jobText: string,
   cvs: Record<CvTrack, MasterCv>,
@@ -231,7 +231,7 @@ export function scoreDualTracks(
   )
 
   const bestTrack: CvTrack =
-    powerPlatform.score > frontend.score ? 'powerPlatform' : 'frontend'
+    frontend.score > powerPlatform.score ? 'frontend' : 'powerPlatform'
   const bestScore = Math.max(frontend.score, powerPlatform.score)
 
   return { frontend, powerPlatform, bestTrack, bestScore }

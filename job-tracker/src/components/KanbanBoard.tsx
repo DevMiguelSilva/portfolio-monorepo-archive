@@ -1,11 +1,14 @@
 import { useState } from 'react'
 import type { JobApplication, JobStatus } from '../types/job'
 import { BOARD_STATUS_ORDER, STATUS_CONFIG, STATUS_ORDER } from '../types/job'
+import { filterJobsBySearch } from '../lib/jobSearch'
 import { attachCardDragGhost, JobCard } from './JobCard'
 
 interface KanbanBoardProps {
   jobs: JobApplication[]
   onMoveJob: (id: string, status: JobStatus) => void
+  /** Filter cards across all columns (company, role, URL, external id). */
+  searchQuery?: string
   /** When false, Rejected column is hidden (jobs still tracked). */
   showRejected?: boolean
   onHideRejected?: () => void
@@ -19,6 +22,7 @@ interface KanbanBoardProps {
 export function KanbanBoard({
   jobs,
   onMoveJob,
+  searchQuery = '',
   showRejected = false,
   onHideRejected,
   showTrash = false,
@@ -30,6 +34,9 @@ export function KanbanBoard({
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [dropTarget, setDropTarget] = useState<JobStatus | null>(null)
   const columns = showRejected ? STATUS_ORDER : BOARD_STATUS_ORDER
+  const visibleJobs = filterJobsBySearch(jobs, searchQuery)
+  const searching = searchQuery.trim().length > 0
+  const visibleTrash = filterJobsBySearch(trashedJobs, searchQuery)
 
   const handleDrop = (status: JobStatus) => {
     if (draggedId) {
@@ -44,7 +51,7 @@ export function KanbanBoard({
       <div className="flex min-w-min gap-4">
         {columns.map((status) => {
           const config = STATUS_CONFIG[status]
-          const columnJobs = jobs.filter((job) => job.status === status)
+          const columnJobs = visibleJobs.filter((job) => job.status === status)
           const isTarget = dropTarget === status && draggedId != null
 
           return (
@@ -87,7 +94,7 @@ export function KanbanBoard({
               >
                 {columnJobs.length === 0 ? (
                   <p className="rounded-lg border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400 dark:border-track-700">
-                    Drop jobs here
+                    {searching ? 'No matches in this column' : 'Drop jobs here'}
                   </p>
                 ) : (
                   columnJobs.map((job) => (
@@ -117,7 +124,7 @@ export function KanbanBoard({
               <h2 className="text-sm font-semibold text-slate-600 dark:text-slate-300">Trash</h2>
               <div className="flex items-center gap-2">
                 <span className="rounded-full bg-white/60 px-2 py-0.5 text-xs font-bold dark:bg-black/20">
-                  {trashedJobs.length}
+                  {visibleTrash.length}
                 </span>
                 {onHideTrash && (
                   <button
@@ -131,12 +138,12 @@ export function KanbanBoard({
               </div>
             </div>
             <div className="min-h-[7rem] space-y-2">
-              {trashedJobs.length === 0 ? (
+              {visibleTrash.length === 0 ? (
                 <p className="rounded-lg border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400 dark:border-track-700">
-                  No deleted jobs
+                  {searching ? 'No matches in trash' : 'No deleted jobs'}
                 </p>
               ) : (
-                trashedJobs.map((job) => (
+                visibleTrash.map((job) => (
                   <JobCard
                     key={job.id}
                     job={job}

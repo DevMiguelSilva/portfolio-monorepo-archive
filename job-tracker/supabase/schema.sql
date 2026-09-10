@@ -80,6 +80,7 @@ alter table saved_searches add column if not exists query_mode text not null def
 alter table saved_searches add column if not exists what_or text not null default '';
 alter table saved_searches add column if not exists what_and text not null default '';
 alter table saved_searches add column if not exists what_phrase text not null default '';
+alter table job_applications add column if not exists saved_search_id uuid references saved_searches on delete set null;
 alter table job_applications add column if not exists cv_track text;
 alter table job_inbox add column if not exists matched_track text;
 

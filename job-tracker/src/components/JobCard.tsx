@@ -2,7 +2,6 @@ import type { DragEvent } from 'react'
 import { Link } from 'react-router-dom'
 import type { JobApplication } from '../types/job'
 import { SourceBadge } from './SourceBadge'
-import { StatusBadge } from './StatusBadge'
 
 interface JobCardProps {
   job: JobApplication
@@ -60,7 +59,6 @@ export function JobCard({
           </div>
         )}
         <div className="flex flex-wrap items-center gap-1.5">
-          <StatusBadge status={job.status} />
           <SourceBadge source={job.source} />
           {!job.jdComplete && (
             <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">

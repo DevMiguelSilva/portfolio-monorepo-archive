@@ -1,5 +1,5 @@
 import { useMemo, useState, type DragEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { attachCardDragGhost } from '../components/JobCard'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { SourceBadge } from '../components/SourceBadge'
@@ -7,7 +7,7 @@ import { useInbox } from '../hooks/useInbox'
 import { useSavedSearches } from '../hooks/useSavedSearches'
 import { parseDualTrackReason } from '../lib/matchScore'
 import { expandSearchLocations } from '../lib/searchLocations'
-import { CV_TRACK_LABELS } from '../types/cv'
+import { CV_TRACK_LABELS, CV_TRACKS, type CvTrack } from '../types/cv'
 import {
   formControlClass,
   formGridClass,
@@ -16,7 +16,7 @@ import {
   formPrimaryBtnClass,
   formSelectClass,
 } from '../lib/formUi'
-import { createEmptySavedSearch, type SavedSearch, type SearchTrack } from '../types/job'
+import { createEmptySavedSearch, type SavedSearch } from '../types/job'
 
 const emptyDraft = {
   label: '',
@@ -24,11 +24,10 @@ const emptyDraft = {
   location: '',
   maxDaysOld: 7,
   excludeTerms: '',
-  track: 'auto' as SearchTrack,
+  track: 'powerPlatform' as CvTrack,
 }
 
 export function InboxPage() {
-  const navigate = useNavigate()
   const {
     inbox,
     loading,
@@ -161,8 +160,7 @@ export function InboxPage() {
     setActionId(id)
     setError(null)
     try {
-      const jobId = await approveJob(id)
-      navigate(`/job/${jobId}`)
+      await approveJob(id)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Approve failed')
     } finally {
@@ -206,7 +204,7 @@ export function InboxPage() {
       location: search.location,
       maxDaysOld: search.maxDaysOld,
       excludeTerms: search.excludeTerms ?? '',
-      track: search.track,
+      track: search.track === 'frontend' ? 'frontend' : 'powerPlatform',
     })
   }
 
@@ -490,8 +488,9 @@ export function InboxPage() {
                     const dual = parseDualTrackReason(job.matchReasons)
                     return dual ? (
                       <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                        {CV_TRACK_LABELS.frontend} {dual.frontend}% ·{' '}
-                        {CV_TRACK_LABELS.powerPlatform} {dual.powerPlatform}%
+                        {CV_TRACKS.map(
+                          (t) => `${CV_TRACK_LABELS[t]} ${dual[t]}%`
+                        ).join(' · ')}
                       </p>
                     ) : null
                   })()}
@@ -623,12 +622,14 @@ function SearchFields({
         <span className={formLabelClass}>CV track</span>
         <select
           value={draft.track}
-          onChange={(e) => setDraft((d) => ({ ...d, track: e.target.value as SearchTrack }))}
+          onChange={(e) => setDraft((d) => ({ ...d, track: e.target.value as CvTrack }))}
           className={formSelectClass}
         >
-          <option value="auto">Auto (best match)</option>
-          <option value="frontend">React</option>
-          <option value="powerPlatform">Power Platform</option>
+          {CV_TRACKS.map((track) => (
+            <option key={track} value={track}>
+              {CV_TRACK_LABELS[track]}
+            </option>
+          ))}
         </select>
       </label>
     </div>

@@ -22,6 +22,7 @@ export interface JobRow {
   claimed_skills?: string[] | null
   source?: string
   external_id?: string
+  saved_search_id?: string | null
   match_score?: number | null
   cv_track?: string | null
   jd_complete?: boolean | null
@@ -129,6 +130,7 @@ export function rowToJob(row: JobRow): JobApplication {
     claimedSkills: row.claimed_skills ?? [],
     source: row.source ?? 'manual',
     externalId: row.external_id ?? '',
+    savedSearchId: row.saved_search_id ?? null,
     matchScore: row.match_score ?? null,
     cvTrack: asCvTrack(row.cv_track),
     jdComplete: resolveJdComplete({
@@ -160,6 +162,7 @@ export function jobToRow(job: JobApplication, userId: string): Omit<JobRow, 'cre
     claimed_skills: job.claimedSkills ?? [],
     source: job.source,
     external_id: job.externalId,
+    saved_search_id: job.savedSearchId,
     match_score: job.matchScore,
     cv_track: job.cvTrack,
     jd_complete: job.jdComplete,

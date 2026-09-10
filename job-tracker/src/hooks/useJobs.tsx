@@ -51,6 +51,7 @@ function normalizeJob(job: JobApplication): JobApplication {
     appliedDate: resolveAppliedDate(status, job.appliedDate, updatedAt),
     source: job.source ?? 'manual',
     externalId: job.externalId ?? '',
+    savedSearchId: job.savedSearchId ?? null,
     matchScore: job.matchScore ?? null,
     cvTrack: job.cvTrack ?? null,
     jdSummary: job.jdSummary ?? '',

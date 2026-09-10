@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { AppLogo } from '../components/AppLogo'
 import { useAuth } from '../hooks/useAuth'
 import { isSupabaseConfigured } from '../lib/supabase'
 
@@ -46,12 +47,15 @@ export function AuthPage() {
   }
 
   return (
-    <div className="mx-auto max-w-md px-6 py-16">
-      <div className="rounded-2xl border border-slate-200 bg-white p-8 dark:border-track-700 dark:bg-track-800">
-        <h1 className="text-2xl font-bold">ApplyTrack</h1>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          Sign in to sync your job applications across devices.
-        </p>
+    <div className="mx-auto max-w-md px-6 py-10">
+      <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+        <div className="mb-4 flex items-center gap-3">
+          <AppLogo />
+          <div>
+            <h1 className="text-2xl font-bold">ApplyTrack</h1>
+            <p className="text-sm text-slate-500">Sign in to sync across devices</p>
+          </div>
+        </div>
 
         <div className="mt-6 flex rounded-lg bg-slate-100 p-1 dark:bg-track-900">
           <button

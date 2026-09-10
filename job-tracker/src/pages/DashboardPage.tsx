@@ -8,13 +8,26 @@ import {
   computeApplyStreak,
   countApplyDaysInYear,
 } from '../lib/applyStreak'
+import { collectSearchHits } from '../lib/jobSearch'
 import { STATUS_CONFIG, STATUS_ORDER } from '../types/job'
 import { useJobs } from '../hooks/useJobs'
+
+function hitColumnLabel(trashed: boolean, status: string): string {
+  if (trashed) return 'Trash'
+  return STATUS_CONFIG[status as keyof typeof STATUS_CONFIG]?.label ?? status
+}
 
 export function DashboardPage() {
   const { jobs, activeJobs, trashedJobs, moveJob, restoreJob, purgeJob, loading } = useJobs()
   const [showRejected, setShowRejected] = useState(false)
   const [showTrash, setShowTrash] = useState(false)
+  const [boardSearch, setBoardSearch] = useState('')
+
+  const searchHits = useMemo(
+    () => collectSearchHits(activeJobs, trashedJobs, boardSearch),
+    [activeJobs, trashedJobs, boardSearch]
+  )
+  const searching = boardSearch.trim().length > 0
 
   const stats = STATUS_ORDER.map((status) => ({
     status,
@@ -127,7 +140,84 @@ export function DashboardPage() {
       </section>
 
       <section>
-        <h2 className="mb-4 text-xl font-bold">Application Board</h2>
+        <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-xl font-bold">Application Board</h2>
+          <div className="relative w-full sm:max-w-xs">
+            <label htmlFor="board-search" className="sr-only">
+              Search applications
+            </label>
+            <svg
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+              aria-hidden
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"
+              />
+            </svg>
+            <input
+              id="board-search"
+              type="search"
+              value={boardSearch}
+              onChange={(e) => setBoardSearch(e.target.value)}
+              placeholder="Company, role, URL…"
+              className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-9 text-sm outline-none ring-track-accent/20 transition placeholder:text-slate-400 focus:border-track-accent focus:ring-2 dark:border-track-700 dark:bg-track-900"
+              autoComplete="off"
+            />
+            {boardSearch && (
+              <button
+                type="button"
+                onClick={() => setBoardSearch('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-track-800 dark:hover:text-slate-200"
+                aria-label="Clear search"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+                  <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {searching && (
+          <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
+            <span
+              className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                searchHits.length >= 2
+                  ? 'bg-amber-100 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200'
+                  : searchHits.length === 1
+                    ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-200'
+                    : 'bg-slate-100 text-slate-600 dark:bg-track-800 dark:text-slate-300'
+              }`}
+            >
+              {searchHits.length === 0
+                ? 'No matches'
+                : searchHits.length === 1
+                  ? '1 match'
+                  : `${searchHits.length} matches`}
+            </span>
+            {searchHits.map(({ job, trashed }) => (
+              <Link
+                key={job.id}
+                to={`/job/${job.id}`}
+                className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-700 transition hover:border-track-accent/40 hover:bg-slate-50 dark:border-track-700 dark:bg-track-800 dark:text-slate-200 dark:hover:bg-track-700/80"
+              >
+                <span className="truncate font-medium">
+                  {job.company || 'Unknown'} · {job.role || 'Untitled'}
+                </span>
+                <span className="shrink-0 text-slate-400">
+                  {hitColumnLabel(trashed, job.status)}
+                </span>
+              </Link>
+            ))}
+          </div>
+        )}
+
         {loading ? (
           <p className="text-sm text-slate-500">Loading applications…</p>
         ) : activeJobs.length === 0 && trashedJobs.length === 0 ? (
@@ -144,6 +234,7 @@ export function DashboardPage() {
         ) : (
           <KanbanBoard
             jobs={activeJobs}
+            searchQuery={boardSearch}
             onMoveJob={moveJob}
             showRejected={showRejected}
             onHideRejected={() => setShowRejected(false)}

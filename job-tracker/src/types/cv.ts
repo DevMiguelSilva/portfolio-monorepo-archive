@@ -1,6 +1,6 @@
 export type CvTrack = 'frontend' | 'powerPlatform'
 
-export const CV_TRACKS: CvTrack[] = ['frontend', 'powerPlatform']
+export const CV_TRACKS: CvTrack[] = ['powerPlatform', 'frontend']
 
 export const CV_TRACK_LABELS: Record<CvTrack, string> = {
   frontend: 'React',
@@ -261,7 +261,7 @@ export function createDefaultMasterCv(): MasterCv {
 export function createDefaultLibrary(): MasterCvLibrary {
   const now = new Date().toISOString()
   return {
-    activeTrack: 'frontend',
+    activeTrack: 'powerPlatform',
     cvs: {
       frontend: createDefaultFrontendCv(),
       powerPlatform: createDefaultPowerPlatformCv(),
@@ -286,7 +286,7 @@ export function normalizeLibrary(raw: unknown): MasterCvLibrary {
     const cvs = obj.cvs as Partial<Record<CvTrack, MasterCv>>
     const attachments = (obj.attachments ?? {}) as Partial<Record<CvTrack, ResumeAttachment | null>>
     return {
-      activeTrack: obj.activeTrack === 'powerPlatform' ? 'powerPlatform' : 'frontend',
+      activeTrack: obj.activeTrack === 'frontend' ? 'frontend' : 'powerPlatform',
       cvs: {
         frontend: normalizeMasterCv(cvs.frontend, base.cvs.frontend),
         powerPlatform: normalizeMasterCv(cvs.powerPlatform, base.cvs.powerPlatform),

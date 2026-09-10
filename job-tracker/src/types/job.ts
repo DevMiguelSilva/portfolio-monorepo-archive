@@ -27,6 +27,8 @@ export interface JobApplication {
   claimedSkills: string[]
   source: string
   externalId: string
+  /** Saved search that surfaced this job (Adzuna inbox approve only). */
+  savedSearchId: string | null
   matchScore: number | null
   cvTrack: CvTrack | null
   /**
@@ -162,6 +164,7 @@ export function createEmptyJob(overrides: Partial<JobApplication> = {}): JobAppl
     claimedSkills: [],
     source: 'indeed',
     externalId: '',
+    savedSearchId: null,
     matchScore: null,
     cvTrack: null,
     jdComplete: true,
@@ -232,7 +235,7 @@ export function createEmptySavedSearch(overrides: Partial<SavedSearch> = {}): Sa
     country: 'ca',
     maxDaysOld: 7,
     excludeTerms: '',
-    track: 'auto',
+    track: 'powerPlatform',
     active: true,
     sortOrder: 0,
     createdAt: now,

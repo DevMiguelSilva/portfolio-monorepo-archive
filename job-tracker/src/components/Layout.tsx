@@ -9,7 +9,7 @@ export function Layout() {
         <Outlet />
       </main>
       <footer className="border-t border-slate-200 py-6 text-center text-xs text-slate-500 dark:border-track-800">
-        ApplyTrack · Portfolio Project #2 · Built by Miguel Silva
+        ApplyTrack · Built by Miguel Silva
       </footer>
     </div>
   )

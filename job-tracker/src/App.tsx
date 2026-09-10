@@ -1,7 +1,8 @@
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
-import { LoadingSpinner } from './components/LoadingSpinner'
+import { ProtectedRoute } from './components/ProtectedRoute'
 import { AuthProvider, useAuth } from './hooks/useAuth'
+import { useTheme } from './hooks/useTheme'
 import { InboxProvider } from './hooks/useInbox'
 import { JobsProvider } from './hooks/useJobs'
 import { MasterCvProvider } from './hooks/useMasterCv'
@@ -16,17 +17,14 @@ import { JobDetailPage } from './pages/JobDetailPage'
 import { MasterCvPage } from './pages/MasterCvPage'
 import { PortalsPage } from './pages/PortalsPage'
 
+function LoginRoute() {
+  const { user, isCloudEnabled } = useAuth()
+  if (!isCloudEnabled) return <Navigate to="/" replace />
+  if (user) return <Navigate to="/" replace />
+  return <AuthPage />
+}
+
 function AppRoutes() {
-  const { user, loading, isCloudEnabled } = useAuth()
-
-  if (isCloudEnabled && loading) {
-    return <LoadingSpinner label="Checking session…" />
-  }
-
-  if (isCloudEnabled && !user) {
-    return <AuthPage />
-  }
-
   return (
     <JobsProvider>
       <MasterCvProvider>
@@ -37,12 +35,15 @@ function AppRoutes() {
                 <BrowserRouter>
                   <Routes>
                     <Route element={<Layout />}>
-                      <Route index element={<DashboardPage />} />
-                      <Route path="inbox" element={<InboxPage />} />
-                      <Route path="portals" element={<PortalsPage />} />
-                      <Route path="add" element={<AddJobPage />} />
-                      <Route path="job/:id" element={<JobDetailPage />} />
-                      <Route path="cv" element={<MasterCvPage />} />
+                      <Route path="login" element={<LoginRoute />} />
+                      <Route element={<ProtectedRoute />}>
+                        <Route index element={<DashboardPage />} />
+                        <Route path="inbox" element={<InboxPage />} />
+                        <Route path="portals" element={<PortalsPage />} />
+                        <Route path="add" element={<AddJobPage />} />
+                        <Route path="job/:id" element={<JobDetailPage />} />
+                        <Route path="cv" element={<MasterCvPage />} />
+                      </Route>
                     </Route>
                   </Routes>
                 </BrowserRouter>
@@ -56,6 +57,8 @@ function AppRoutes() {
 }
 
 export default function App() {
+  useTheme()
+
   return (
     <AuthProvider>
       <AppRoutes />

@@ -7,6 +7,7 @@ import { StatusBadge } from '../components/StatusBadge'
 import { TailorPanel } from '../components/TailorPanel'
 import { useJobs } from '../hooks/useJobs'
 import { useMasterCv } from '../hooks/useMasterCv'
+import { useSavedSearches } from '../hooks/useSavedSearches'
 import {
   formAccentBtnClass,
   formControlClass,
@@ -21,8 +22,9 @@ import { CV_TRACK_LABELS, CV_TRACKS, type CvTrack } from '../types/cv'
 export function JobDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { getJob, deleteJob, restoreJob, purgeJob, updateJob } = useJobs()
+  const { getJob, deleteJob, restoreJob, purgeJob, updateJob, moveJob } = useJobs()
   const { getCv, activeTrack, library } = useMasterCv()
+  const { searches } = useSavedSearches()
   const job = id ? getJob(id) : undefined
   const [showFullJd, setShowFullJd] = useState(false)
   const [editingTrack, setEditingTrack] = useState(false)
@@ -41,6 +43,13 @@ export function JobDetailPage() {
       job.extractedSkills
     )
   }, [job, getCv, library])
+
+  const adzunaSearchLabel = useMemo(() => {
+    if (!job || job.source !== 'adzuna' || !job.savedSearchId) return null
+    const search = searches.find((s) => s.id === job.savedSearchId)
+    if (!search) return null
+    return search.label.trim() || search.query.trim() || null
+  }, [job, searches])
 
   if (!job) {
     return (
@@ -71,7 +80,7 @@ export function JobDetailPage() {
     }
   }
 
-  const selectedTrack = job.cvTrack ?? activeTrack
+  const selectedTrack = job.cvTrack ?? activeTrack ?? 'powerPlatform'
   const showInterviewPrep = job.status === 'interview'
   const hasUrl = Boolean(job.jobUrl.trim())
   // Prefer stored score (includes user-claimed gap skills) over raw CV-only dual score.
@@ -161,6 +170,7 @@ export function JobDetailPage() {
         jdComplete: true,
       })
       setEditingJd(false)
+      setShowFullJd(false)
     } catch (err) {
       setJdError(err instanceof Error ? err.message : 'Failed to update job description')
     } finally {
@@ -191,6 +201,11 @@ export function JobDetailPage() {
           <div className="mt-2 flex flex-wrap gap-3 text-sm text-slate-500 dark:text-slate-400">
             {job.location && <span>📍 {job.location}</span>}
             {job.salary && <span>💰 {job.salary}</span>}
+            {adzunaSearchLabel && (
+              <span className="font-medium text-slate-600 dark:text-slate-300">
+                via search: {adzunaSearchLabel}
+              </span>
+            )}
             {job.status !== 'saved' && job.appliedDate && (
               <span>📅 Applied {job.appliedDate}</span>
             )}
@@ -239,13 +254,24 @@ export function JobDetailPage() {
               </button>
             </>
           ) : (
-            <button
-              type="button"
-              onClick={handleDelete}
-              className="rounded-lg border border-red-300 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950/30"
-            >
-              Move to Trash
-            </button>
+            <>
+              {!job.deletedAt && job.status === 'saved' && job.jdComplete && (
+                <button
+                  type="button"
+                  onClick={() => moveJob(job.id, 'applied')}
+                  className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-800"
+                >
+                  Mark as applied
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="rounded-lg border border-red-300 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950/30"
+              >
+                Move to Trash
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -461,7 +487,7 @@ export function JobDetailPage() {
       )}
 
       {showInterviewPrep && <InterviewPrepPanel job={job} />}
-      <TailorPanel job={job} />
+      {job.jdComplete && <TailorPanel job={job} />}
     </div>
   )
 }
