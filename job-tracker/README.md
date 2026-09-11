@@ -1,4 +1,4 @@
-# ApplyTrack v2 — Find · Tailor · Track
+# ApplyTrack — Find · Tailor · Track
 
 Human-in-the-loop job search for Canada front-end roles: refresh an Adzuna-powered inbox, approve fits into a Kanban tracker, tailor a DOCX from your master CV, and keep JD + notes ready for interview calls.
 
