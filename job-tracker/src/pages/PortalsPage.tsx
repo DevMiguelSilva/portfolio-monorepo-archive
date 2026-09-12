@@ -1,5 +1,5 @@
 import { useMemo, useState, type DragEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { PageToolbar } from '../components/PageToolbar'
 import { ActivityHeatmap } from '../components/ActivityHeatmap'
 import { attachCardDragGhost } from '../components/JobCard'
 import { LoadingSpinner } from '../components/LoadingSpinner'
@@ -12,6 +12,7 @@ import {
   formPrimaryBtnClass,
   formSelectClass,
 } from '../lib/formUi'
+import { btnPrimaryClass } from '../lib/appUi'
 import { countCompleteDaysInYear } from '../lib/huntStreak'
 import {
   PORTAL_SOURCE_LABELS,
@@ -156,22 +157,19 @@ export function PortalsPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <Link to="/" className="text-sm text-slate-500 hover:text-track-accent dark:text-slate-400">
-            ← Back to board
-          </Link>
-          <h1 className="mt-2 text-2xl font-bold">Portals</h1>
-        </div>
-        <button
-          type="button"
-          onClick={handleOpenAll}
-          disabled={activeFeeds.length === 0}
-          className="rounded-lg bg-track-accent px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600 disabled:opacity-50"
-        >
-          Open all active ({activeFeeds.length})
-        </button>
-      </div>
+      <PageToolbar
+        title="Portals"
+        actions={
+          <button
+            type="button"
+            onClick={handleOpenAll}
+            disabled={activeFeeds.length === 0}
+            className={btnPrimaryClass}
+          >
+            Open all active ({activeFeeds.length})
+          </button>
+        }
+      />
 
       <section className="grid gap-4 sm:grid-cols-3">
         <div

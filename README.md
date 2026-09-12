@@ -6,8 +6,7 @@ Personal portfolio workspace for **Miguel Silva** — software developer career 
 
 | Project | Folder | Stack | Description |
 |---------|--------|-------|-------------|
-| **Portfolio Site** | [portfolio](./portfolio) | React, TypeScript, Tailwind | Main landing page showcasing all work |
-| **Cine — Movie Discovery** | [movie-discovery](./movie-discovery) | React, TMDB API | Search movies, scores, trailers, reviews |
+| **Portfolio Site** | [portfolio](./portfolio) | React, TypeScript, Tailwind | Main landing page showcasing work |
 | **ApplyTrack — AI Job Tracker** | [job-tracker](./job-tracker) | React, Gemini AI, Supabase | Kanban job board with AI tools + cloud sync |
 
 ## Structure
@@ -15,7 +14,6 @@ Personal portfolio workspace for **Miguel Silva** — software developer career 
 ```
 Portafolio/
 ├── portfolio/         ← Main portfolio website
-├── movie-discovery/   ← Movie app
 ├── job-tracker/       ← AI job tracker with Supabase
 ├── DEPLOY.md          ← Step-by-step deploy guide
 └── README.md
@@ -27,7 +25,6 @@ Each app runs independently:
 
 ```bash
 cd portfolio && npm install && npm run dev
-cd movie-discovery && npm install && npm run dev
 cd job-tracker && npm install && npm run dev
 ```
 

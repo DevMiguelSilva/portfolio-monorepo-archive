@@ -241,7 +241,7 @@ export function JobDetailPage() {
               <button
                 type="button"
                 onClick={handleRestore}
-                className="rounded-lg bg-track-accent px-3 py-2 text-sm font-medium text-white hover:bg-indigo-600"
+                className="rounded-lg bg-track-accent px-3 py-2 text-sm font-medium text-white hover:bg-sky-600"
               >
                 Restore
               </button>
@@ -434,7 +434,7 @@ export function JobDetailPage() {
                 {job.extractedSkills.map((skill) => (
                   <span
                     key={skill}
-                    className="rounded-full bg-indigo-50 px-3 py-1 text-sm text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400"
+                    className="rounded-full bg-sky-50 px-3 py-1 text-sm text-sky-600 dark:bg-sky-950/50 dark:text-sky-400"
                   >
                     {skill}
                   </span>

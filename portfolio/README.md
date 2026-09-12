@@ -4,11 +4,11 @@ Personal portfolio showcasing software development projects built with React and
 
 ## Sections
 
-- **Hero** — Introduction and call-to-action
+- **Hero** — Introduction, LinkedIn & GitHub links
 - **About** — Professional background
-- **Projects** — Live links to Movie Discovery and ApplyTrack
+- **Projects** — ApplyTrack featured project
 - **Skills** — Tech stack
-- **Contact** — GitHub link
+- **Contact** — LinkedIn & GitHub
 
 ## Run locally
 
@@ -25,9 +25,9 @@ cp .env.example .env
 
 | Variable | Description |
 |----------|-------------|
-| `VITE_MOVIE_APP_URL` | Deployed movie app URL |
 | `VITE_JOB_TRACKER_URL` | Deployed job tracker URL |
 | `VITE_GITHUB_URL` | Your GitHub profile |
+| `VITE_LINKEDIN_URL` | Your LinkedIn profile |
 
 ## Deploy
 

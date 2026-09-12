@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -9,15 +9,21 @@
     scroll-behavior: smooth;
   }
   body {
-    @apply bg-brand-950 text-gray-100 antialiased;
+    @apply bg-surface-50 text-stone-900 antialiased;
   }
 }
 
 @layer utilities {
   .gradient-text {
-    @apply bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-teal-600 via-emerald-600 to-amber-600 bg-clip-text text-transparent;
   }
-  .glass {
-    @apply border border-white/10 bg-white/5 backdrop-blur;
+  .section-label {
+    @apply text-xs font-semibold uppercase tracking-[0.2em] text-teal-700;
+  }
+  .card {
+    @apply rounded-2xl border border-stone-200/80 bg-white shadow-sm shadow-stone-200/50;
+  }
+  .card-hover {
+    @apply transition duration-300 hover:-translate-y-0.5 hover:border-teal-200 hover:shadow-md hover:shadow-teal-100/70;
   }
 }

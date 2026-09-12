@@ -116,9 +116,9 @@ export const STATUS_CONFIG: Record<
   },
   applied: {
     label: 'Applied',
-    color: 'text-indigo-600 dark:text-indigo-400',
-    bg: 'bg-indigo-50 dark:bg-indigo-950/40',
-    border: 'border-indigo-300 dark:border-indigo-800',
+    color: 'text-sky-600 dark:text-sky-400',
+    bg: 'bg-sky-50 dark:bg-sky-950/40',
+    border: 'border-sky-300 dark:border-sky-800',
   },
   interview: {
     label: 'Interview',

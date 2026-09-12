@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { parseJobPosting } from '../api/gemini'
+import { PageToolbar } from '../components/PageToolbar'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { useJobs } from '../hooks/useJobs'
 import { useMasterCv } from '../hooks/useMasterCv'
@@ -107,14 +108,9 @@ export function AddJobPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-8">
-      <div>
-        <Link to="/" className="text-sm text-slate-500 hover:text-track-accent dark:text-slate-400">
-          ← Back to board
-        </Link>
-        <h1 className="mt-2 text-2xl font-bold">Add Application</h1>
-      </div>
+      <PageToolbar title="Add application" />
 
-      <div className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-5 dark:border-indigo-900 dark:bg-indigo-950/20">
+      <div className="rounded-2xl border border-sky-100 bg-sky-50/60 p-5 shadow-sm">
         <h2 className="mb-3 font-semibold">Quick add with AI</h2>
         <textarea
           value={pasteText}
@@ -130,7 +126,7 @@ export function AddJobPage() {
           type="button"
           onClick={handleParseAndFill}
           disabled={parsing || !pasteText.trim()}
-          className="mt-2 rounded-lg bg-track-accent px-4 py-2 text-sm font-medium text-white hover:bg-indigo-600 disabled:opacity-50"
+          className="mt-2 rounded-lg bg-track-accent px-4 py-2 text-sm font-medium text-white hover:bg-sky-600 disabled:opacity-50"
         >
           {parsing ? 'Parsing…' : 'Parse with AI'}
         </button>
@@ -267,7 +263,7 @@ export function AddJobPage() {
               {form.extractedSkills.map((skill) => (
                 <span
                   key={skill}
-                  className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-400"
+                  className="rounded-full bg-sky-50 px-2 py-0.5 text-xs text-sky-600 dark:bg-sky-950/50 dark:text-sky-400"
                 >
                   {skill}
                 </span>

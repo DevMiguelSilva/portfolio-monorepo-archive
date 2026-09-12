@@ -12,16 +12,13 @@ import type { HuntDay } from '../types/portal'
 import type { StreakFeed } from '../lib/huntStreak'
 
 const LEVEL_CLASS: Record<HeatLevel, string> = {
-  // Empty past days — visible “dark” square (not invisible)
-  0: 'bg-slate-200 dark:bg-track-900',
-  // Clear steps for 1 / 2 / 3+ applies
-  1: 'bg-emerald-200 dark:bg-emerald-900/55',
-  2: 'bg-emerald-500 dark:bg-emerald-600',
-  3: 'bg-emerald-800 dark:bg-emerald-300',
+  0: 'bg-slate-200',
+  1: 'bg-emerald-200',
+  2: 'bg-emerald-500',
+  3: 'bg-emerald-700',
 }
 
-const FUTURE_CLASS =
-  'border border-dashed border-slate-300/90 bg-transparent dark:border-track-600 dark:bg-transparent'
+const FUTURE_CLASS = 'border border-dashed border-slate-300/90 bg-transparent'
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -114,7 +111,7 @@ export function ActivityHeatmap(props: ActivityHeatmapProps) {
   return (
     <div className="space-y-3">
       {mode === 'year' && (
-        <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{year}</p>
+        <p className="text-xs font-medium text-slate-500">{year}</p>
       )}
       <div className="app-scroll flex gap-2 overflow-x-auto pb-1">
         <div className="flex flex-col justify-between py-1 text-[10px] text-slate-400">

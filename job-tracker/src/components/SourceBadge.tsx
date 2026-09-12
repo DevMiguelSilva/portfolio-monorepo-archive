@@ -15,7 +15,7 @@ const SOURCE_STYLES: Record<string, string> = {
   ziprecruiter:
     'bg-green-100 text-green-800 ring-1 ring-inset ring-green-300/80 dark:bg-green-950/60 dark:text-green-300 dark:ring-green-700',
   linkedin:
-    'bg-indigo-100 text-indigo-800 ring-1 ring-inset ring-indigo-300/80 dark:bg-indigo-950/60 dark:text-indigo-300 dark:ring-indigo-700',
+    'bg-sky-100 text-sky-800 ring-1 ring-inset ring-sky-300/80 dark:bg-sky-950/60 dark:text-sky-300 dark:ring-sky-700',
   other:
     'bg-teal-100 text-teal-800 ring-1 ring-inset ring-teal-300/80 dark:bg-teal-950/60 dark:text-teal-300 dark:ring-teal-700',
 }

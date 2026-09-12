@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { PageHero } from '../components/PageHero'
 import { ActivityHeatmap } from '../components/ActivityHeatmap'
 import { KanbanBoard } from '../components/KanbanBoard'
 import {
@@ -9,6 +10,7 @@ import {
   countApplyDaysInYear,
 } from '../lib/applyStreak'
 import { collectSearchHits } from '../lib/jobSearch'
+import { pageCardClass, pageCardHoverClass, btnPrimaryClass } from '../lib/appUi'
 import { STATUS_CONFIG, STATUS_ORDER } from '../types/job'
 import { useJobs } from '../hooks/useJobs'
 
@@ -44,26 +46,31 @@ export function DashboardPage() {
   )
 
   return (
-    <div className="space-y-8">
-      <section className="rounded-2xl bg-gradient-to-br from-indigo-600 via-track-accent to-indigo-800 px-6 py-10 text-white sm:px-10">
-        <p className="mb-1 text-sm uppercase tracking-widest text-indigo-200">ApplyTrack</p>
-        <h1 className="text-3xl font-bold sm:text-4xl">Find · Tailor · Track</h1>
-      </section>
+    <div className="space-y-6">
+      <PageHero
+        label="ApplyTrack"
+        title={
+          <>
+            Find · Tailor · <span className="gradient-text">Track</span>
+          </>
+        }
+        description="Your job-search command center — inbox matches, Kanban pipeline, and AI tailoring in one place."
+      />
 
-      <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-track-700 dark:bg-track-800">
+      <section className={`${pageCardClass} p-5 sm:p-6`}>
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-          <h2 className="font-semibold">Application streak</h2>
+          <h2 className="font-display font-semibold text-slate-900">Application streak</h2>
           <div className="flex flex-wrap gap-4 text-sm">
             <div>
               <p className="text-xs text-slate-400">Streak</p>
-              <p className="font-bold text-track-accent">
+              <p className="font-bold text-sky-600">
                 {applyStreak} day{applyStreak === 1 ? '' : 's'}
               </p>
             </div>
             <div>
               <p className="text-xs text-slate-400">Today</p>
               <p className="font-bold">
-                {appliedToday} apply{appliedToday === 1 ? '' : 's'}
+                {appliedToday} {appliedToday === 1 ? 'apply' : 'applies'}
               </p>
             </div>
             <div>
@@ -79,14 +86,14 @@ export function DashboardPage() {
         {stats.map(({ status, count }) => {
           const isRejected = status === 'rejected'
           const active = isRejected && showRejected
-          const className = `rounded-xl border p-4 text-center transition ${
+          const className = `rounded-2xl border p-4 text-center transition ${pageCardHoverClass} ${
             isRejected
               ? `w-full ${
                   active
-                    ? 'border-red-300 bg-red-50 ring-2 ring-red-200 dark:border-red-800 dark:bg-red-950/30 dark:ring-red-900'
-                    : 'border-slate-200 bg-white hover:border-red-300 dark:border-track-700 dark:bg-track-800 dark:hover:border-red-800'
+                    ? 'border-red-200 bg-red-50 ring-2 ring-red-100'
+                    : 'border-slate-200 bg-white hover:border-red-200'
                 }`
-              : 'border-slate-200 bg-white dark:border-track-700 dark:bg-track-800'
+              : `${pageCardClass} border-slate-200/80`
           }`
 
           if (isRejected) {
@@ -99,8 +106,8 @@ export function DashboardPage() {
                 aria-pressed={showRejected}
                 title={showRejected ? 'Hide Rejected column' : 'Show Rejected column on the board'}
               >
-                <p className="text-2xl font-bold text-track-accent">{count}</p>
-                <p className="text-xs capitalize text-slate-500 dark:text-slate-400">
+                <p className="text-2xl font-bold text-sky-600">{count}</p>
+                <p className="text-xs capitalize text-slate-500">
                   {STATUS_CONFIG[status].label}
                   <span className="mt-0.5 block text-[10px] font-normal normal-case text-slate-400">
                     {showRejected ? 'Click to hide column' : 'Click to show on board'}
@@ -112,8 +119,8 @@ export function DashboardPage() {
 
           return (
             <div key={status} className={className}>
-              <p className="text-2xl font-bold text-track-accent">{count}</p>
-              <p className="text-xs capitalize text-slate-500 dark:text-slate-400">{status}</p>
+              <p className="text-2xl font-bold text-sky-600">{count}</p>
+              <p className="text-xs capitalize text-slate-500">{status}</p>
             </div>
           )
         })}
@@ -121,15 +128,15 @@ export function DashboardPage() {
         <button
           type="button"
           onClick={() => setShowTrash((v) => !v)}
-          className={`rounded-xl border p-4 text-center transition ${
+          className={`rounded-2xl border p-4 text-center transition ${pageCardHoverClass} ${
             showTrash
-              ? 'border-slate-400 bg-slate-100 ring-2 ring-slate-300 dark:border-track-500 dark:bg-track-900 dark:ring-track-600'
-              : 'border-slate-200 bg-white hover:border-slate-400 dark:border-track-700 dark:bg-track-800 dark:hover:border-track-500'
+              ? 'border-slate-300 bg-slate-50 ring-2 ring-slate-200'
+              : `${pageCardClass} border-slate-200/80 hover:border-slate-300`
           }`}
           aria-pressed={showTrash}
           title={showTrash ? 'Hide Trash column' : 'Show Trash column on the board'}
         >
-          <p className="text-2xl font-bold text-track-accent">{trashedJobs.length}</p>
+          <p className="text-2xl font-bold text-sky-600">{trashedJobs.length}</p>
           <p className="text-xs text-slate-500 dark:text-slate-400">
             Trash
             <span className="mt-0.5 block text-[10px] font-normal normal-case text-slate-400">
@@ -140,8 +147,7 @@ export function DashboardPage() {
       </section>
 
       <section>
-        <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="text-xl font-bold">Application Board</h2>
+        <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
           <div className="relative w-full sm:max-w-xs">
             <label htmlFor="board-search" className="sr-only">
               Search applications
@@ -166,14 +172,14 @@ export function DashboardPage() {
               value={boardSearch}
               onChange={(e) => setBoardSearch(e.target.value)}
               placeholder="Company, role, URL…"
-              className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-9 text-sm outline-none ring-track-accent/20 transition placeholder:text-slate-400 focus:border-track-accent focus:ring-2 dark:border-track-700 dark:bg-track-900"
+              className="w-full rounded-full border border-slate-200 bg-white py-2.5 pl-9 pr-9 text-sm outline-none ring-sky-100 transition placeholder:text-slate-400 focus:border-sky-400 focus:ring-2"
               autoComplete="off"
             />
             {boardSearch && (
               <button
                 type="button"
                 onClick={() => setBoardSearch('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-track-800 dark:hover:text-slate-200"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
                 aria-label="Clear search"
               >
                 <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
@@ -189,10 +195,10 @@ export function DashboardPage() {
             <span
               className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                 searchHits.length >= 2
-                  ? 'bg-amber-100 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200'
+                  ? 'bg-amber-100 text-amber-900'
                   : searchHits.length === 1
-                    ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-200'
-                    : 'bg-slate-100 text-slate-600 dark:bg-track-800 dark:text-slate-300'
+                    ? 'bg-emerald-100 text-emerald-900'
+                    : 'bg-slate-100 text-slate-600'
               }`}
             >
               {searchHits.length === 0
@@ -205,7 +211,7 @@ export function DashboardPage() {
               <Link
                 key={job.id}
                 to={`/job/${job.id}`}
-                className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-700 transition hover:border-track-accent/40 hover:bg-slate-50 dark:border-track-700 dark:bg-track-800 dark:text-slate-200 dark:hover:bg-track-700/80"
+                className="inline-flex max-w-full items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-700 transition hover:border-sky-200 hover:bg-sky-50/50"
               >
                 <span className="truncate font-medium">
                   {job.company || 'Unknown'} · {job.role || 'Untitled'}
@@ -221,13 +227,10 @@ export function DashboardPage() {
         {loading ? (
           <p className="text-sm text-slate-500">Loading applications…</p>
         ) : activeJobs.length === 0 && trashedJobs.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-300 p-12 text-center dark:border-track-700">
+          <div className={`rounded-2xl border border-dashed border-slate-300 ${pageCardClass} p-12 text-center`}>
             <p className="text-4xl">📋</p>
-            <h3 className="mt-3 font-semibold">No applications yet</h3>
-            <Link
-              to="/add"
-              className="mt-4 inline-block rounded-lg bg-track-accent px-4 py-2 text-sm font-medium text-white hover:bg-indigo-600"
-            >
+            <h3 className="mt-3 font-display font-semibold text-slate-900">No applications yet</h3>
+            <Link to="/add" className={`mt-4 inline-block ${btnPrimaryClass}`}>
               Add your first job
             </Link>
           </div>

@@ -1,20 +1,19 @@
 /** Shared compact form styles for add/edit panels across the app. */
 
 export const formPanelClass =
-  'space-y-2.5 rounded-lg border border-slate-200 bg-slate-50/80 p-3 dark:border-track-700 dark:bg-track-900/40'
+  'space-y-2.5 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-200/40'
 
 export const formGridClass = 'grid gap-2 sm:grid-cols-2'
 
 export const formLabelClass = 'text-xs font-medium text-slate-500'
 
 export const formControlClass =
-  'mt-0.5 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-track-accent focus:ring-2 focus:ring-track-accent/20 dark:border-track-700 dark:bg-track-900'
+  'mt-0.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100'
 
-/** Select control — chevron inset defined in index.css (.form-select). */
 export const formSelectClass = `${formControlClass} form-select`
 
 export const formPrimaryBtnClass =
-  'rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-medium text-white dark:bg-slate-100 dark:text-slate-900'
+  'rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800'
 
 export const formAccentBtnClass =
-  'rounded-lg bg-track-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-600'
+  'rounded-full bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700'

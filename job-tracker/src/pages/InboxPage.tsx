@@ -1,5 +1,5 @@
 import { useMemo, useState, type DragEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { PageToolbar } from '../components/PageToolbar'
 import { attachCardDragGhost } from '../components/JobCard'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { SourceBadge } from '../components/SourceBadge'
@@ -16,6 +16,7 @@ import {
   formPrimaryBtnClass,
   formSelectClass,
 } from '../lib/formUi'
+import { btnGhostClass, btnPrimaryClass } from '../lib/appUi'
 import { createEmptySavedSearch, type SavedSearch } from '../types/job'
 
 const emptyDraft = {
@@ -223,58 +224,52 @@ export function InboxPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <Link to="/" className="text-sm text-slate-500 hover:text-track-accent dark:text-slate-400">
-            ← Back to board
-          </Link>
-          <h1 className="mt-2 text-2xl font-bold">Job Inbox</h1>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setShowSearches((v) => !v)}
-            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium dark:border-track-700"
-          >
-            {showSearches ? 'Hide searches' : `Saved searches (${searches.length})`}
-          </button>
-          <button
-            type="button"
-            onClick={handleClearReview}
-            disabled={refreshing || newCount === 0}
-            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium dark:border-track-700 disabled:opacity-50"
-          >
-            Clear review list
-          </button>
-          <button
-            type="button"
-            onClick={handleRefresh}
-            disabled={refreshing || Boolean(runningAloneId)}
-            className="rounded-lg bg-track-accent px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600 disabled:opacity-50"
-          >
+      <PageToolbar
+        title="Inbox"
+        actions={
+          <>
+            <button
+              type="button"
+              onClick={() => setShowSearches((v) => !v)}
+              className={btnGhostClass}
+            >
+              {showSearches ? 'Hide searches' : `Saved searches (${searches.length})`}
+            </button>
+            <button
+              type="button"
+              onClick={handleClearReview}
+              disabled={refreshing || newCount === 0}
+              className={btnGhostClass}
+            >
+              Clear review list
+            </button>
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={refreshing || Boolean(runningAloneId)}
+              className={btnPrimaryClass}
+            >
             {refreshing && !runningAloneId ? 'Refreshing…' : 'Refresh active'}
-          </button>
-        </div>
-      </div>
+            </button>
+          </>
+        }
+      />
 
-      <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm dark:border-track-700 dark:bg-track-800">
-        <span className="font-semibold text-track-accent">{newCount}</span> roles ready to review
+      <div className="rounded-2xl border border-slate-200/80 bg-white px-4 py-3 text-sm shadow-sm">
+        <span className="font-semibold text-sky-600">{newCount}</span> roles ready to review
         {newCount > 0 && (
-          <span className="text-slate-500 dark:text-slate-400">
+          <span className="text-slate-500">
             {' '}
-            · <span className="font-medium text-emerald-600 dark:text-emerald-400">{firstSeenCount}</span>{' '}
-            new
+            · <span className="font-medium text-emerald-600">{firstSeenCount}</span> new
             {seenBeforeCount > 0 && (
               <>
                 {' '}
-                ·{' '}
-                <span className="font-medium text-amber-700 dark:text-amber-300">{seenBeforeCount}</span>{' '}
-                seen before
+                · <span className="font-medium text-amber-700">{seenBeforeCount}</span> seen before
               </>
             )}
           </span>
         )}
-        <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+        <span className="mt-1 block text-xs text-slate-500">
           {activeSearches.length === 0
             ? searches.length === 0
               ? 'No saved searches yet.'
@@ -377,7 +372,7 @@ export function InboxPage() {
                         type="button"
                         disabled={refreshing || Boolean(runningAloneId)}
                         onClick={() => handleRunAlone(search.id)}
-                        className="rounded-md bg-track-accent px-2 py-1 text-xs font-semibold text-white hover:bg-indigo-600 disabled:opacity-50"
+                        className="rounded-md bg-track-accent px-2 py-1 text-xs font-semibold text-white hover:bg-sky-600 disabled:opacity-50"
                       >
                         {runningAloneId === search.id ? 'Running…' : 'Run alone'}
                       </button>
@@ -529,7 +524,7 @@ export function InboxPage() {
                     type="button"
                     disabled={actionId === job.id}
                     onClick={() => handleApprove(job.id)}
-                    className="rounded-lg bg-track-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-600 disabled:opacity-50"
+                    className="rounded-lg bg-track-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-600 disabled:opacity-50"
                   >
                     Approve
                   </button>

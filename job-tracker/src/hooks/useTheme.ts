@@ -1,9 +1,11 @@
-import { useEffect } from 'react'
+import { useLayoutEffect } from 'react'
 
-/** Light-only for now — toggle hidden in UI. */
+/** Light-only — strip .dark before paint and block OS-driven dark styles. */
 export function useTheme() {
-  useEffect(() => {
-    document.documentElement.classList.remove('dark')
+  useLayoutEffect(() => {
+    const root = document.documentElement
+    root.classList.remove('dark')
+    root.style.colorScheme = 'light'
     localStorage.setItem('job-tracker-theme', 'light')
   }, [])
 

@@ -47,7 +47,7 @@ export function KanbanBoard({
   }
 
   return (
-    <div className="app-scroll max-h-[40rem] overflow-auto rounded-xl border border-slate-200 bg-slate-50/50 p-3 dark:border-track-700 dark:bg-track-900/40">
+    <div className="app-scroll max-h-[40rem] overflow-auto rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 shadow-sm">
       <div className="flex min-w-min gap-4">
         {columns.map((status) => {
           const config = STATUS_CONFIG[status]
@@ -69,7 +69,7 @@ export function KanbanBoard({
               onDrop={() => handleDrop(status)}
             >
               <div
-                className={`sticky top-0 z-10 mb-3 flex items-center justify-between rounded-lg border px-3 py-2 backdrop-blur-sm ${config.bg} ${config.border}`}
+                className={`sticky top-0 z-10 mb-3 flex items-center justify-between rounded-xl border px-3 py-2.5 backdrop-blur-sm ${config.bg} ${config.border}`}
               >
                 <h2 className={`text-sm font-semibold ${config.color}`}>{config.label}</h2>
                 <div className="flex items-center gap-2">
