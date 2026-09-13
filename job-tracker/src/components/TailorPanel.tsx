@@ -1,13 +1,15 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { tailorMasterCv } from '../api/gemini'
 import { downloadApplicationPack, openCvPrintWindow } from '../lib/docxExport'
 import { buildGapReport } from '../lib/matchScore'
+import { suggestTransferableSkills, transferCheck, transferDifficultyClass, transferDifficultyLabel } from '../lib/skillTransfer'
 import type { GapReport, MasterCv, TailoredDocument } from '../types/cv'
 import {
   CV_TRACK_LABELS,
   EMPTY_GAP_REPORT,
   lockSkillGroupsToMaster,
   masterCvSearchText,
+  masterCvSkillList,
   mergeClaimedSkillsIntoGroups,
 } from '../types/cv'
 import type { JobApplication } from '../types/job'
@@ -223,6 +225,14 @@ export function TailorPanel({ job }: TailorPanelProps) {
     })
 
   const claimedKeywords = gapReport.claimedKeywords ?? []
+  const transferSuggestions = useMemo(
+    () =>
+      suggestTransferableSkills(gapReport.missingKeywords, [
+        ...masterCvSkillList(masterCv),
+        ...gapReport.matchedKeywords,
+      ]),
+    [gapReport.missingKeywords, gapReport.matchedKeywords, masterCv]
+  )
 
   return (
     <div className="space-y-4 rounded-xl border border-emerald-200 bg-emerald-50/40 p-5 dark:border-emerald-900 dark:bg-emerald-950/20">
@@ -338,6 +348,73 @@ export function TailorPanel({ job }: TailorPanelProps) {
               <li key={s}>• {s}</li>
             ))}
           </ul>
+          {transferSuggestions.length > 0 && (
+            <div className="mt-4 border-t border-slate-100 pt-3 dark:border-track-700">
+              <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                Missing vs your CV
+              </h4>
+              <p className="mt-1 text-xs text-slate-500">
+                Every amber skill is listed on a 5-level scale: Very easy, Easy, Moderate, Hard, Big
+                gap. Check a close hop only if you honestly know it or can pick it up quickly. Hard
+                and big gap mean skip it unless you truly have it.
+              </p>
+              <div className="mt-3 overflow-x-auto">
+                <table className="min-w-[28rem] w-full text-left text-sm">
+                  <thead className="text-xs uppercase tracking-wide text-slate-400">
+                    <tr>
+                      <th className="pb-2 pr-3 font-medium">Missing skill</th>
+                      <th className="pb-2 pr-3 font-medium">Your base</th>
+                      <th className="pb-2 pr-3 font-medium">From zero</th>
+                      <th className="pb-2 font-medium">Check it?</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-track-700">
+                    {transferSuggestions.map((row) => (
+                      <tr key={row.skill}>
+                        <td className="py-2 pr-3 font-medium text-slate-800 dark:text-slate-100">
+                          {row.skill}
+                        </td>
+                        <td className="py-2 pr-3 text-slate-600 dark:text-slate-300">
+                          {row.relatedOwned.length > 0
+                            ? row.relatedOwned.join(', ')
+                            : 'No close skill on this CV'}
+                        </td>
+                        <td className="py-2 pr-3">
+                          <span className={transferDifficultyClass(row.difficulty)}>
+                            {transferDifficultyLabel(row.difficulty)}
+                          </span>
+                        </td>
+                        <td className="py-2">
+                          {row.checkIt ? (
+                            <button
+                              type="button"
+                              disabled={!!loading}
+                              onClick={() => void toggleClaimedSkill(row.skill)}
+                              className="text-xs font-semibold text-track-accent hover:underline disabled:opacity-50"
+                            >
+                              {transferCheck(row.difficulty) === 'yes'
+                                ? 'Yes — check'
+                                : 'Probably — check'}
+                            </button>
+                          ) : (
+                            <span
+                              className={
+                                row.difficulty === 'hard'
+                                  ? 'text-xs font-semibold text-orange-700 dark:text-orange-300'
+                                  : 'text-xs font-semibold text-rose-700 dark:text-rose-300'
+                              }
+                            >
+                              {transferCheck(row.difficulty) === 'unlikely' ? 'Unlikely' : 'No'}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

@@ -33,6 +33,7 @@ export function JobDetailPage() {
   const [savingJd, setSavingJd] = useState(false)
   const [parsingJd, setParsingJd] = useState(false)
   const [jdError, setJdError] = useState<string | null>(null)
+  const [jdCopied, setJdCopied] = useState(false)
 
   const dual = useMemo(() => {
     if (!job) return null
@@ -95,6 +96,18 @@ export function JobDetailPage() {
     )
     await updateJob(job.id, { cvTrack: track, matchScore: match.score })
     setEditingTrack(false)
+  }
+
+  const copyFullJd = async () => {
+    const text = job.jobDescription.trim()
+    if (!text) return
+    try {
+      await navigator.clipboard.writeText(text)
+      setJdCopied(true)
+      window.setTimeout(() => setJdCopied(false), 2000)
+    } catch {
+      setJdCopied(false)
+    }
   }
 
   const openJdEditor = () => {
@@ -458,31 +471,58 @@ export function JobDetailPage() {
 
           {job.jobDescription ? (
             <div className="border-t border-slate-100 pt-3 dark:border-track-700">
-              <button
-                type="button"
-                onClick={() => setShowFullJd((v) => !v)}
-                className="text-sm font-medium text-track-accent hover:underline"
-                aria-expanded={showFullJd}
-              >
-                {showFullJd
-                  ? 'Hide job description'
-                  : jdIncomplete
-                    ? 'Show listing preview'
-                    : 'Show full job description'}
-              </button>
-              {showFullJd && (
-                <div
-                  className="mt-3 max-h-[28rem] overflow-y-auto whitespace-pre-wrap text-sm leading-relaxed text-slate-700 dark:text-slate-300"
-                  role="region"
-                  aria-label="Job description"
+              {showFullJd ? (
+                <>
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="font-semibold">Job description</h3>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => void copyFullJd()}
+                        className="text-xs text-track-accent hover:underline"
+                      >
+                        {jdCopied ? 'Copied' : 'Copy'}
+                      </button>
+                      <button
+                        type="button"
+                        className="text-xs text-slate-500 hover:underline"
+                        onClick={() => setShowFullJd(false)}
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                  <div
+                    className="max-h-[28rem] overflow-y-auto whitespace-pre-wrap text-sm leading-relaxed text-slate-700 dark:text-slate-300"
+                    role="region"
+                    aria-label="Job description"
+                  >
+                    {job.jobDescription}
+                  </div>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowFullJd(true)}
+                  className="text-sm font-medium text-track-accent hover:underline"
+                  aria-expanded={false}
                 >
-                  {job.jobDescription}
-                </div>
+                  {jdIncomplete ? 'Show listing preview' : 'Show full job description'}
+                </button>
               )}
             </div>
           ) : (
             <p className="text-sm text-slate-500">No JD saved yet.</p>
           )}
+        </section>
+      )}
+
+      {job.notes.trim() && !/^Approved from inbox\b/i.test(job.notes.trim()) && (
+        <section className="space-y-2 rounded-xl border border-slate-200 bg-white p-5 dark:border-track-700 dark:bg-track-800">
+          <h2 className="font-semibold">Personal notes</h2>
+          <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700 dark:text-slate-300">
+            {job.notes}
+          </p>
         </section>
       )}
 

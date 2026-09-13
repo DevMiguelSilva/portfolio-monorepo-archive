@@ -39,6 +39,18 @@ const ALIAS_GROUPS: string[][] = [
   ['sql server', 'mssql', 't-sql', 'tsql'],
   ['spfx', 'sharepoint framework'],
   ['power shell', 'powershell'],
+  [
+    'agile',
+    'scrum',
+    'agile methodologies',
+    'agile methodology',
+    'agile/scrum',
+    'agile scrum',
+    'agile/scrum methodology',
+    'agile/scrum methodologies',
+    'scrum methodology',
+    'scrum methodologies',
+  ],
 ]
 
 /** Extra lexicon so inbox can mine JD keywords even when AI extract is empty. */
@@ -83,14 +95,58 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+const FILLER_WORDS = /\b(methodolog(?:y|ies)|methods?)\b/g
+
+function stripFiller(value: string): string {
+  return value.replace(FILLER_WORDS, ' ').replace(/[/\s]+/g, ' ').trim()
+}
+
+function splitCompounds(value: string): string[] {
+  return value
+    .split(/\s*(?:\/|&|\band\b)\s*/)
+    .map((part) => part.trim())
+    .filter((part) => part.length >= 3)
+}
+
+function aliasesFor(value: string): string[] {
+  return ALIAS_GROUPS.filter((group) =>
+    group.some((alias) => alias === value || value.includes(alias) || alias.includes(value))
+  ).flat()
+}
+
 function variantsFor(skill: string): string[] {
   const n = normalize(skill)
   if (!n) return []
-  const group = ALIAS_GROUPS.find((g) => g.some((alias) => alias === n || n.includes(alias) || alias.includes(n)))
-  const set = new Set<string>([n, ...(group ?? [])])
-  // Compact form without spaces for PowerApps-style tokens
-  if (n.includes(' ')) set.add(n.replace(/\s+/g, ''))
+  const set = new Set<string>()
+
+  const add = (raw: string) => {
+    const v = normalize(raw)
+    if (!v) return
+    set.add(v)
+    if (v.includes(' ')) set.add(v.replace(/\s+/g, ''))
+    for (const alias of aliasesFor(v)) {
+      if (alias) set.add(alias)
+    }
+  }
+
+  add(n)
+  const stripped = stripFiller(n)
+  if (stripped) add(stripped)
+  for (const part of splitCompounds(n)) {
+    add(part)
+    const partStripped = stripFiller(part)
+    if (partStripped) add(partStripped)
+  }
+
   return [...set].filter(Boolean)
+}
+
+function haystackHasNeedle(haystack: string, needle: string): boolean {
+  if (needle.length <= 2 || !needle.includes(' ')) {
+    const re = new RegExp(`(?:^|[^a-z0-9+#])${escapeRegExp(needle)}(?:[^a-z0-9+#]|$)`)
+    return re.test(haystack)
+  }
+  return haystack.includes(needle)
 }
 
 /** True if skill (or an alias) appears in haystack. */
@@ -100,12 +156,7 @@ export function textHasSkill(haystack: string, skill: string): boolean {
 
   for (const needle of variantsFor(skill)) {
     if (!needle) continue
-    if (needle.length <= 2) {
-      const re = new RegExp(`(?:^|\\s)${escapeRegExp(needle)}(?:\\s|$)`)
-      if (re.test(h)) return true
-      continue
-    }
-    if (h.includes(needle)) return true
+    if (haystackHasNeedle(h, needle)) return true
   }
   return false
 }
@@ -333,12 +384,11 @@ export function buildGapReport(
           `You confirmed ${claimedKeywords.length} skill(s) for this job — they’ll be included when you tailor.`,
         ]
       : []),
-    ...missingKeywords
-      .slice(0, 5)
-      .map(
-        (k) =>
-          `Not found in this master CV: "${k}". Click it if you know it, then tailor.`
-      ),
+    ...(missingKeywords.length > 0
+      ? [
+          'Amber chips are not on this master CV. Click one if you already know it, or use the transferable list when a missing skill is a short hop from skills you have.',
+        ]
+      : []),
   ]
 
   return {
