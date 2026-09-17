@@ -1,10 +1,12 @@
-import { textHasSkill } from './matchScore'
+import { normalize, textHasSkill } from './matchScore'
 
 export type TransferDifficulty = 'very-easy' | 'easy' | 'moderate' | 'hard' | 'gap'
 
 export interface TransferSuggestion {
   skill: string
   relatedOwned: string[]
+  /** Shown when there is no CV hop — e.g. everyday tools. */
+  baseLabel: string | null
   difficulty: TransferDifficulty
   /** True = worth confirming as a near-match. */
   checkIt: boolean
@@ -50,6 +52,49 @@ const FAMILIES: SkillFamily[] = [
       'power query',
       'dax',
       'data modeling',
+    ],
+  },
+  {
+    members: [
+      'excel',
+      'word',
+      'microsoft word',
+      'ms-word',
+      'powerpoint',
+      'outlook',
+      'microsoft office',
+      'ms office',
+      'office 365',
+      'microsoft 365',
+      'google docs',
+      'google sheets',
+      'google slides',
+    ],
+  },
+  {
+    members: [
+      'jira',
+      'asana',
+      'trello',
+      'monday',
+      'clickup',
+      'azure boards',
+      'confluence',
+      'agile',
+      'scrum',
+      'kanban',
+      'project management',
+    ],
+  },
+  {
+    members: [
+      'teams',
+      'microsoft teams',
+      'slack',
+      'zoom',
+      'outlook',
+      'sharepoint',
+      'onedrive',
     ],
   },
   {
@@ -152,6 +197,110 @@ const CROSS_LINKS: { missing: string[]; related: string[]; difficulty: TransferD
   },
 ]
 
+/** From-zero learnability when the CV has no hop. First matching bucket wins. */
+const BASELINE: { difficulty: TransferDifficulty; aliases: string[] }[] = [
+  {
+    difficulty: 'very-easy',
+    aliases: [
+      'microsoft word',
+      'ms word',
+      'ms-word',
+      'msword',
+      'word',
+      'powerpoint',
+      'power point',
+      'excel',
+      'outlook',
+      'microsoft office',
+      'ms office',
+      'office 365',
+      'microsoft 365',
+      'm365',
+      'google docs',
+      'google sheets',
+      'google slides',
+      'gmail',
+      'onedrive',
+    ],
+  },
+  {
+    difficulty: 'easy',
+    aliases: [
+      'jira',
+      'asana',
+      'trello',
+      'confluence',
+      'notion',
+      'slack',
+      'microsoft teams',
+      'teams',
+      'zoom',
+      'monday',
+      'clickup',
+      'linear',
+      'basecamp',
+      'miro',
+      'lucidchart',
+      'canva',
+      'figma',
+      'dropbox',
+      'git',
+      'github',
+      'gitlab',
+      'bitbucket',
+      'vs code',
+      'visual studio code',
+      'postman',
+    ],
+  },
+]
+
+/** Real stacks that take months without a related CV base. */
+const HARD_FROM_ZERO = [
+  'python',
+  'java',
+  'kotlin',
+  'swift',
+  'rust',
+  'golang',
+  'go',
+  'ruby',
+  'php',
+  'scala',
+  'c++',
+  'c#',
+  'dart',
+  'flutter',
+  'kubernetes',
+  'k8s',
+  'terraform',
+  'ansible',
+  'salesforce',
+  'servicenow',
+  'docker',
+  'graphql',
+  'kafka',
+  'spark',
+]
+
+/** Career-change specialties — only these default to Big gap. */
+const GAP_FROM_ZERO = [
+  'sap',
+  'abap',
+  'cobol',
+  'fortran',
+  'embedded',
+  'fpga',
+  'matlab',
+  'hadoop',
+  'peoplesoft',
+  'oracle ebs',
+  'tensorflow',
+  'pytorch',
+  'machine learning',
+  'deep learning',
+]
+
 function skillKey(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ')
 }
@@ -204,6 +353,50 @@ function crossRelated(missing: string, ownedSkills: string[]): {
   return { related, difficulty: rule.difficulty }
 }
 
+function matchesAny(skill: string, aliases: string[]): boolean {
+  return aliases.some((alias) => textHasSkill(skill, alias) || textHasSkill(alias, skill))
+}
+
+function heuristicBaseline(skill: string): TransferDifficulty | null {
+  const n = normalize(skill)
+  if (
+    /\b(communicat|teamwork|collaborat|document|presentat|stakeholder|time management|problem solving|attention to detail|multitask|organiz)\w*\b/.test(
+      n
+    )
+  ) {
+    return 'very-easy'
+  }
+  if (/\b(word|powerpoint|ppt|excel|outlook|office|gmail|docs|sheets|slides)\b/.test(n)) {
+    return 'very-easy'
+  }
+  if (/\b(jira|asana|trello|confluence|notion|slack|teams|zoom|monday|clickup|kanban|agile|scrum)\b/.test(n)) {
+    return 'easy'
+  }
+  if (/\b(git|github|gitlab|vscode|vs code|postman|sharepoint)\b/.test(n)) {
+    return 'easy'
+  }
+  return null
+}
+
+/** How hard this skill is with no related CV item. Never returns null. */
+function baselineFromZero(skill: string): TransferDifficulty {
+  for (const row of BASELINE) {
+    if (matchesAny(skill, row.aliases)) return row.difficulty
+  }
+  const heuristic = heuristicBaseline(skill)
+  if (heuristic) return heuristic
+  if (matchesAny(skill, GAP_FROM_ZERO)) return 'gap'
+  if (matchesAny(skill, HARD_FROM_ZERO)) return 'hard'
+  // Unknown JD keyword: treat as a learnable product, not a career change.
+  return 'moderate'
+}
+
+function easier(a: TransferDifficulty | null, b: TransferDifficulty | null): TransferDifficulty {
+  const list = [a, b].filter((value): value is TransferDifficulty => Boolean(value))
+  if (list.length === 0) return 'gap'
+  return list.sort((x, y) => DIFFICULTY_RANK[x] - DIFFICULTY_RANK[y])[0]
+}
+
 function difficultyFromFamilyCount(count: number): TransferDifficulty {
   if (count >= 3) return 'very-easy'
   if (count === 2) return 'easy'
@@ -216,6 +409,13 @@ function difficultyFromCrossCount(count: number, rule: TransferDifficulty): Tran
   if (rule === 'very-easy') return 'easy'
   if (rule === 'easy') return 'moderate'
   return 'hard'
+}
+
+function baseLabelFor(difficulty: TransferDifficulty): string {
+  if (difficulty === 'very-easy' || difficulty === 'easy') return 'Everyday tool — quick to pick up'
+  if (difficulty === 'moderate') return 'Learnable without a CV match'
+  if (difficulty === 'hard') return 'New stack — real study time'
+  return 'No close skill on this CV'
 }
 
 export function transferDifficultyLabel(difficulty: TransferDifficulty): string {
@@ -244,7 +444,7 @@ export function transferCheck(difficulty: TransferDifficulty): TransferCheck {
 }
 
 /**
- * Rank every missing JD skill against the Master CV.
+ * Rank every missing JD skill: CV hop and from-zero learnability, take the easier.
  * 1 Very easy · 2 Easy · 3 Moderate · 4 Hard · 5 Big gap
  */
 export function suggestTransferableSkills(
@@ -259,29 +459,25 @@ export function suggestTransferableSkills(
   for (const skill of missingKeywords) {
     const fromFamily = familyRelated(skill, owned)
     const fromCross = crossRelated(skill, owned)
+    const relatedOwnedSkills = uniqueLabels([...fromFamily, ...(fromCross?.related ?? [])])
+    const baseline = baselineFromZero(skill)
 
-    let relatedOwnedSkills = uniqueLabels([
-      ...fromFamily,
-      ...(fromCross?.related ?? []),
-    ])
-    let difficulty: TransferDifficulty
-
+    let transfer: TransferDifficulty | null = null
     if (fromFamily.length > 0) {
-      difficulty = difficultyFromFamilyCount(fromFamily.length)
+      transfer = difficultyFromFamilyCount(fromFamily.length)
       if (fromFamily.length === 1 && fromCross && fromCross.related.length >= 2) {
-        difficulty = 'very-easy'
+        transfer = 'very-easy'
       }
     } else if (fromCross && fromCross.related.length > 0) {
-      difficulty = difficultyFromCrossCount(fromCross.related.length, fromCross.difficulty)
-    } else {
-      difficulty = 'gap'
-      relatedOwnedSkills = []
+      transfer = difficultyFromCrossCount(fromCross.related.length, fromCross.difficulty)
     }
 
+    const difficulty = easier(transfer, baseline)
     const check = transferCheck(difficulty)
     suggestions.push({
       skill,
       relatedOwned: relatedOwnedSkills,
+      baseLabel: relatedOwnedSkills.length > 0 ? null : baseLabelFor(difficulty),
       difficulty,
       checkIt: check === 'yes' || check === 'probably',
     })

@@ -51,6 +51,12 @@ const ALIAS_GROUPS: string[][] = [
     'scrum methodology',
     'scrum methodologies',
   ],
+  ['microsoft word', 'ms word', 'ms-word', 'msword', 'word'],
+  ['microsoft excel', 'ms excel', 'excel'],
+  ['powerpoint', 'power point', 'ms powerpoint'],
+  ['microsoft office', 'ms office', 'office 365', 'microsoft 365', 'm365', 'ms365'],
+  ['jira', 'atlassian jira'],
+  ['asana'],
 ]
 
 /** Extra lexicon so inbox can mine JD keywords even when AI extract is empty. */

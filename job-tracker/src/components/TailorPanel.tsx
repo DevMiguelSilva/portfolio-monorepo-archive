@@ -354,9 +354,10 @@ export function TailorPanel({ job }: TailorPanelProps) {
                 Missing vs your CV
               </h4>
               <p className="mt-1 text-xs text-slate-500">
-                Every amber skill is listed on a 5-level scale: Very easy, Easy, Moderate, Hard, Big
-                gap. Check a close hop only if you honestly know it or can pick it up quickly. Hard
-                and big gap mean skip it unless you truly have it.
+                Every amber skill is scored two ways — a hop from your CV, and how hard it is from
+                zero. The easier one wins. Word, Jira, and similar tools are never a big gap just
+                because they are not listed. Hard and big gap are for real stacks that take serious
+                study.
               </p>
               <div className="mt-3 overflow-x-auto">
                 <table className="min-w-[28rem] w-full text-left text-sm">
@@ -377,7 +378,7 @@ export function TailorPanel({ job }: TailorPanelProps) {
                         <td className="py-2 pr-3 text-slate-600 dark:text-slate-300">
                           {row.relatedOwned.length > 0
                             ? row.relatedOwned.join(', ')
-                            : 'No close skill on this CV'}
+                            : row.baseLabel ?? 'No close skill on this CV'}
                         </td>
                         <td className="py-2 pr-3">
                           <span className={transferDifficultyClass(row.difficulty)}>
