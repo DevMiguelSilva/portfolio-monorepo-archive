@@ -2,6 +2,20 @@ import type { CvTrack } from './cv'
 
 export type JobStatus = 'saved' | 'applied' | 'interview' | 'offer' | 'rejected'
 export type InboxStatus = 'new' | 'approved' | 'dismissed'
+
+export interface InterviewRound {
+  id: string
+  /** Local calendar day (YYYY-MM-DD). */
+  date: string
+  /** Optional round name, such as "Screen" or "Technical". */
+  label: string
+  /** True after the call has happened. */
+  done: boolean
+}
+
+/** Follow-up for the latest interview by date. */
+export type InterviewFollowUp = 'pending' | 'waiting'
+
 export type SearchTrack = CvTrack | 'auto'
 
 export interface JobApplication {
@@ -13,6 +27,8 @@ export interface JobApplication {
   salary: string
   status: JobStatus
   appliedDate: string
+  /** Every scheduled round for this application. Kept if the job leaves Interview. */
+  interviews: InterviewRound[]
   notes: string
   /** Full original job posting text — never replace with an AI summary. */
   jobDescription: string
@@ -140,6 +156,88 @@ export const STATUS_CONFIG: Record<
   },
 }
 
+const INTERVIEW_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+
+function calendarToday(d = new Date()): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/**
+ * Accepts the interviews list, or a legacy single `interviewDate` from older saves.
+ */
+export function resolveInterviews(input: {
+  interviews?: unknown
+  interviewDate?: string | null
+}): InterviewRound[] {
+  const rawList = Array.isArray(input.interviews) ? input.interviews : []
+  const rounds: InterviewRound[] = []
+  for (const item of rawList) {
+    if (!item || typeof item !== 'object') continue
+    const raw = item as { id?: unknown; date?: unknown; label?: unknown; done?: unknown }
+    const date = typeof raw.date === 'string' ? raw.date.slice(0, 10) : ''
+    if (!INTERVIEW_DATE_RE.test(date)) continue
+    const id = typeof raw.id === 'string' && raw.id.trim() ? raw.id : `interview-${date}-${rounds.length}`
+    const label = typeof raw.label === 'string' ? raw.label.trim() : ''
+    rounds.push({ id, date, label, done: raw.done === true })
+  }
+  if (rounds.length === 0) {
+    const legacy = (input.interviewDate ?? '').slice(0, 10)
+    if (INTERVIEW_DATE_RE.test(legacy)) {
+      rounds.push({ id: `legacy-${legacy}`, date: legacy, label: '', done: false })
+    }
+  }
+  rounds.sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id))
+  return rounds
+}
+
+/** Next upcoming round, or the latest one when every date is in the past. */
+export function interviewBoardLine(rounds: InterviewRound[], today = calendarToday()): string | null {
+  if (rounds.length === 0) return null
+  const upcoming = rounds.filter((round) => round.date >= today)
+  const focus = upcoming[0] ?? rounds[rounds.length - 1]
+  const name = focus.label || 'Interview'
+  const when = formatInterviewDate(focus.date)
+  const extra = upcoming.length > 1 ? ` · +${upcoming.length - 1}` : ''
+  return `${name} · ${when}${extra}`
+}
+
+export function isUpcomingInterview(round: InterviewRound, today = calendarToday()): boolean {
+  return round.date >= today
+}
+
+/** The last interview by date decides whether you are still pending or waiting on an answer. */
+export function latestInterviewFollowUp(rounds: InterviewRound[]): InterviewFollowUp | null {
+  if (rounds.length === 0) return null
+  return rounds[rounds.length - 1].done ? 'waiting' : 'pending'
+}
+
+export const INTERVIEW_FOLLOW_UP_LABEL: Record<InterviewFollowUp, string> = {
+  pending: 'Pending',
+  waiting: 'Awaiting answer',
+}
+
+/** Inbox approve writes this into notes; it is not a personal comment. */
+export function personalNotesText(notes: string): string {
+  if (/^Approved from inbox\b/i.test(notes.trim())) return ''
+  return notes
+}
+
+export function formatInterviewDate(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim())
+  if (!match) return value
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(year, month - 1, day)
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+    return value
+  }
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
 export const STATUS_ORDER: JobStatus[] = ['saved', 'applied', 'interview', 'offer', 'rejected']
 
 /** Board columns shown by default (Rejected is opt-in via the stats control). */
@@ -156,6 +254,7 @@ export function createEmptyJob(overrides: Partial<JobApplication> = {}): JobAppl
     salary: '',
     status: 'saved',
     appliedDate: '',
+    interviews: [],
     notes: '',
     jobDescription: '',
     jdSummary: '',

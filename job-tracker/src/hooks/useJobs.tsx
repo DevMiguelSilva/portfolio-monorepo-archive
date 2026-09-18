@@ -11,7 +11,7 @@ import { resolveAppliedDate } from '../lib/appliedDate'
 import { jobToRow, rowToJob } from '../lib/database'
 import { supabase } from '../lib/supabase'
 import type { JobApplication, JobStatus } from '../types/job'
-import { createEmptyJob, resolveJdComplete } from '../types/job'
+import { createEmptyJob, resolveInterviews, resolveJdComplete } from '../types/job'
 import { localDateKey } from '../types/portal'
 import { useAuth } from './useAuth'
 
@@ -40,12 +40,15 @@ interface JobsContextValue {
 
 const JobsContext = createContext<JobsContextValue | null>(null)
 
-function normalizeJob(job: JobApplication): JobApplication {
+function normalizeJob(
+  job: JobApplication & { interviewDate?: string; interviewStage?: string | null }
+): JobApplication {
   const status = job.status ?? 'saved'
   const updatedAt = job.updatedAt ?? createEmptyJob().updatedAt
+  const { interviewDate, interviewStage: _interviewStage, ...rest } = job
   return {
     ...createEmptyJob(),
-    ...job,
+    ...rest,
     status,
     // Saved jobs are not applications — drop stale applied dates from undo moves
     appliedDate: resolveAppliedDate(status, job.appliedDate, updatedAt),
@@ -58,6 +61,10 @@ function normalizeJob(job: JobApplication): JobApplication {
     extractedSkills: job.extractedSkills ?? [],
     extractedRequirements: job.extractedRequirements ?? [],
     claimedSkills: job.claimedSkills ?? [],
+    interviews: resolveInterviews({
+      interviews: rest.interviews,
+      interviewDate,
+    }),
     jdComplete: resolveJdComplete({
       jdComplete: job.jdComplete,
       source: job.source ?? 'manual',

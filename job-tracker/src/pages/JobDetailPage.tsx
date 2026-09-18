@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { parseJobPosting } from '../api/gemini'
+import { InterviewFollowUpBadge } from '../components/InterviewFollowUpBadge'
+import { InterviewList } from '../components/InterviewList'
 import { InterviewPrepPanel } from '../components/InterviewPrepPanel'
 import { ScrollToTopButton } from '../components/ScrollToTopButton'
 import { SourceBadge } from '../components/SourceBadge'
@@ -20,6 +22,7 @@ import {
 } from '../lib/formUi'
 import { formatDualTrackScores, scoreDualTracks, scoreMasterCvAgainstJob } from '../lib/matchScore'
 import { CV_TRACK_LABELS, CV_TRACKS, type CvTrack } from '../types/cv'
+import { interviewBoardLine, latestInterviewFollowUp, personalNotesText } from '../types/job'
 
 export function JobDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -36,6 +39,10 @@ export function JobDetailPage() {
   const [parsingJd, setParsingJd] = useState(false)
   const [jdError, setJdError] = useState<string | null>(null)
   const [jdCopied, setJdCopied] = useState(false)
+  const [editingNotes, setEditingNotes] = useState(false)
+  const [notesDraft, setNotesDraft] = useState('')
+  const [savingNotes, setSavingNotes] = useState(false)
+  const [notesError, setNotesError] = useState<string | null>(null)
 
   const dual = useMemo(() => {
     if (!job) return null
@@ -85,6 +92,23 @@ export function JobDetailPage() {
 
   const selectedTrack = job.cvTrack ?? activeTrack ?? 'powerPlatform'
   const showInterviewPrep = job.status === 'interview'
+  const notesText = personalNotesText(job.notes)
+  const interviewLine = job.status === 'interview' ? interviewBoardLine(job.interviews) : null
+  const followUp = job.status === 'interview' ? latestInterviewFollowUp(job.interviews) : null
+
+  const saveNotes = async () => {
+    setSavingNotes(true)
+    setNotesError(null)
+    try {
+      await updateJob(job.id, { notes: notesDraft })
+      setEditingNotes(false)
+    } catch (err) {
+      setNotesError(err instanceof Error ? err.message : 'Could not save notes')
+    } finally {
+      setSavingNotes(false)
+    }
+  }
+
   const hasUrl = Boolean(job.jobUrl.trim())
   // Prefer stored score (includes user-claimed gap skills) over raw CV-only dual score.
   const selectedScore = job.matchScore ?? dual?.[selectedTrack].score ?? null
@@ -205,6 +229,7 @@ export function JobDetailPage() {
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={job.status} size="md" />
             <SourceBadge source={job.source} size="md" />
+            {followUp && <InterviewFollowUpBadge outcome={followUp} size="md" />}
             {jdIncomplete && (
               <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
                 JD incomplete
@@ -224,6 +249,7 @@ export function JobDetailPage() {
             {job.status !== 'saved' && job.appliedDate && (
               <span>📅 Applied {job.appliedDate}</span>
             )}
+            {interviewLine && <span>{interviewLine}</span>}
             {selectedScore != null && (
               <span>
                 🎯 {selectedScore}% · {CV_TRACK_LABELS[selectedTrack]}
@@ -310,6 +336,14 @@ export function JobDetailPage() {
           )}
         </div>
       </div>
+
+      {job.status === 'interview' && (!job.deletedAt || job.interviews.length > 0) && (
+        <InterviewList
+          interviews={job.interviews}
+          readOnly={Boolean(job.deletedAt)}
+          onSave={(interviews) => updateJob(job.id, { interviews })}
+        />
+      )}
 
       <section className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 sm:grid-cols-2 dark:border-track-700 dark:bg-track-800">
         <div className="min-w-0">
@@ -539,14 +573,67 @@ export function JobDetailPage() {
         </section>
       )}
 
-      {job.notes.trim() && !/^Approved from inbox\b/i.test(job.notes.trim()) && (
-        <section className="space-y-2 rounded-xl border border-slate-200 bg-white p-5 dark:border-track-700 dark:bg-track-800">
+      <section className="space-y-2 rounded-xl border border-slate-200 bg-white p-5 dark:border-track-700 dark:bg-track-800">
+        <div className="flex items-center justify-between gap-2">
           <h2 className="font-semibold">Personal notes</h2>
+          {!editingNotes && (
+            <button
+              type="button"
+              onClick={() => {
+                setNotesDraft(notesText)
+                setNotesError(null)
+                setEditingNotes(true)
+              }}
+              className="text-xs font-medium text-track-accent hover:underline"
+            >
+              Edit
+            </button>
+          )}
+        </div>
+        {editingNotes ? (
+          <div className="space-y-2">
+            <textarea
+              value={notesDraft}
+              onChange={(e) => setNotesDraft(e.target.value)}
+              rows={4}
+              placeholder="Recruiter name, follow-ups, anything you want to remember…"
+              className={formControlClass}
+            />
+            {notesError && (
+              <p className="text-sm text-amber-700 dark:text-amber-300" role="alert">
+                {notesError}
+              </p>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={savingNotes}
+                onClick={() => void saveNotes()}
+                className={`${formPrimaryBtnClass} disabled:opacity-60`}
+              >
+                {savingNotes ? 'Saving…' : 'Save'}
+              </button>
+              <button
+                type="button"
+                disabled={savingNotes}
+                onClick={() => {
+                  setEditingNotes(false)
+                  setNotesError(null)
+                }}
+                className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm dark:border-track-700"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : notesText.trim() ? (
           <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700 dark:text-slate-300">
-            {job.notes}
+            {notesText}
           </p>
-        </section>
-      )}
+        ) : (
+          <p className="text-sm text-slate-500">No notes yet.</p>
+        )}
+      </section>
 
       {showInterviewPrep && <InterviewPrepPanel job={job} />}
       {job.jdComplete && <TailorPanel job={job} />}

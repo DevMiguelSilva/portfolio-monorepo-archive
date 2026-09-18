@@ -1,6 +1,8 @@
 import type { DragEvent } from 'react'
 import { Link } from 'react-router-dom'
 import type { JobApplication } from '../types/job'
+import { interviewBoardLine, isUpcomingInterview, latestInterviewFollowUp } from '../types/job'
+import { InterviewFollowUpBadge } from './InterviewFollowUpBadge'
 import { SourceBadge } from './SourceBadge'
 
 interface JobCardProps {
@@ -22,6 +24,10 @@ export function JobCard({
   onRestore,
   onPurge,
 }: JobCardProps) {
+  const interviewLine = job.status === 'interview' ? interviewBoardLine(job.interviews) : null
+  const followUp = job.status === 'interview' ? latestInterviewFollowUp(job.interviews) : null
+  const hasUpcoming = job.interviews.some((round) => isUpcomingInterview(round))
+
   return (
     <article
       draggable={!trashMode}
@@ -40,6 +46,11 @@ export function JobCard({
           <p className="text-sm text-slate-500">{job.company || 'Unknown company'}</p>
         </div>
         {job.location && <p className="text-xs text-slate-400">📍 {job.location}</p>}
+        {interviewLine && (
+          <p className={`text-xs font-medium ${hasUpcoming ? 'text-sky-700' : 'text-slate-500'}`}>
+            {interviewLine}
+          </p>
+        )}
         {job.extractedSkills.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {job.extractedSkills.slice(0, 3).map((skill) => (
@@ -57,6 +68,7 @@ export function JobCard({
         )}
         <div className="flex flex-wrap items-center gap-1.5">
           <SourceBadge source={job.source} />
+          {followUp && <InterviewFollowUpBadge outcome={followUp} />}
           {!job.jdComplete && (
             <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">
               JD incomplete

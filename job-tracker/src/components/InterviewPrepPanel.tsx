@@ -1,16 +1,13 @@
 import { downloadCvDocx, tailoredDocFilename } from '../lib/docxExport'
-import { formControlClass, formLabelClass } from '../lib/formUi'
 import type { JobApplication } from '../types/job'
-import { useJobs } from '../hooks/useJobs'
 import { useTailoredDocs } from '../hooks/useTailoredDocs'
 
 interface InterviewPrepPanelProps {
   job: JobApplication
 }
 
-/** Shown only when status is Interview — notes + tailored resume, not a second overview. */
+/** Shown only when status is Interview — tailored resume, not a second overview. */
 export function InterviewPrepPanel({ job }: InterviewPrepPanelProps) {
-  const { updateJob } = useJobs()
   const { getForJob } = useTailoredDocs()
   const tailored = getForJob(job.id)
 
@@ -19,7 +16,7 @@ export function InterviewPrepPanel({ job }: InterviewPrepPanelProps) {
       <div>
         <h2 className="text-lg font-bold">Interview prep</h2>
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          Notes and your tailored resume for this call. Posting details stay in the overview above.
+          Tailored resume for this call. Interview dates and your comments stay in the sections above.
         </p>
       </div>
 
@@ -56,17 +53,6 @@ export function InterviewPrepPanel({ job }: InterviewPrepPanelProps) {
           No tailored CV yet — use Tailor CV below before the interview if you need one.
         </p>
       )}
-
-      <label className="block">
-        <span className={formLabelClass}>Interview notes</span>
-        <textarea
-          value={job.notes}
-          onChange={(e) => updateJob(job.id, { notes: e.target.value })}
-          rows={4}
-          placeholder="Recruiter name, date/time, questions asked, follow-ups…"
-          className={formControlClass}
-        />
-      </label>
     </section>
   )
 }

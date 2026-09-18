@@ -2,7 +2,7 @@ import type { CvTrack, GapReport, MasterCv, TailoredDocument } from '../types/cv
 import { EMPTY_GAP_REPORT } from '../types/cv'
 import { coalesceSearchQuery } from './adzunaQuery'
 import type { InboxJob, JobApplication, SavedSearch, SearchTrack, UserProfile } from '../types/job'
-import { resolveJdComplete } from '../types/job'
+import { resolveInterviews, resolveJdComplete } from '../types/job'
 
 export interface JobRow {
   id: string
@@ -14,6 +14,9 @@ export interface JobRow {
   salary: string
   status: JobApplication['status']
   applied_date: string
+  interview_stage?: string | null
+  interview_date?: string | null
+  interviews?: unknown
   notes: string
   job_description: string
   jd_summary?: string
@@ -122,6 +125,10 @@ export function rowToJob(row: JobRow): JobApplication {
     salary: row.salary,
     status: row.status,
     appliedDate: row.applied_date,
+    interviews: resolveInterviews({
+      interviews: row.interviews,
+      interviewDate: row.interview_date,
+    }),
     notes: row.notes,
     jobDescription: row.job_description,
     jdSummary: row.jd_summary ?? '',
@@ -154,6 +161,7 @@ export function jobToRow(job: JobApplication, userId: string): Omit<JobRow, 'cre
     salary: job.salary,
     status: job.status,
     applied_date: job.appliedDate,
+    interviews: job.interviews,
     notes: job.notes,
     job_description: job.jobDescription,
     jd_summary: job.jdSummary,
