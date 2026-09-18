@@ -1,8 +1,52 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import type { JobApplication, JobStatus } from '../types/job'
 import { BOARD_STATUS_ORDER, STATUS_CONFIG, STATUS_ORDER } from '../types/job'
 import { filterJobsBySearch } from '../lib/jobSearch'
 import { attachCardDragGhost, JobCard } from './JobCard'
+
+const COLUMN_HEADER_BG: Record<JobStatus, string> = {
+  saved: 'bg-slate-200',
+  applied: 'bg-sky-100',
+  interview: 'bg-amber-100',
+  offer: 'bg-emerald-100',
+  rejected: 'bg-red-100',
+}
+
+function ColumnHead({
+  title,
+  titleClass,
+  pillClass,
+  borderClass,
+  count,
+  extra,
+}: {
+  title: string
+  titleClass: string
+  pillClass: string
+  borderClass: string
+  count: number
+  extra?: ReactNode
+}) {
+  return (
+    <div className="sticky top-0 z-10 isolate">
+      <div className="bg-slate-50 pt-3">
+        <div
+          className={`flex items-center justify-between rounded-xl border px-3 py-2.5 ${pillClass} ${borderClass}`}
+        >
+          <h2 className={`text-sm font-semibold ${titleClass}`}>{title}</h2>
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-white/80 px-2 py-0.5 text-xs font-bold">{count}</span>
+            {extra}
+          </div>
+        </div>
+      </div>
+      <div
+        className="pointer-events-none h-5 bg-gradient-to-b from-slate-50 to-transparent"
+        aria-hidden
+      />
+    </div>
+  )
+}
 
 interface KanbanBoardProps {
   jobs: JobApplication[]
@@ -47,7 +91,7 @@ export function KanbanBoard({
   }
 
   return (
-    <div className="app-scroll max-h-[40rem] overflow-auto rounded-2xl border border-slate-200/80 bg-slate-50/60 p-3 shadow-sm">
+    <div className="app-scroll max-h-[40rem] overflow-auto rounded-2xl border border-slate-200/80 bg-slate-50 px-3 pb-3 shadow-sm">
       <div className="flex min-w-min gap-4">
         {columns.map((status) => {
           const config = STATUS_CONFIG[status]
@@ -68,27 +112,26 @@ export function KanbanBoard({
               }}
               onDrop={() => handleDrop(status)}
             >
-              <div
-                className={`sticky top-0 z-10 mb-3 flex items-center justify-between rounded-xl border px-3 py-2.5 backdrop-blur-sm ${config.bg} ${config.border}`}
-              >
-                <h2 className={`text-sm font-semibold ${config.color}`}>{config.label}</h2>
-                <div className="flex items-center gap-2">
-                  <span className="rounded-full bg-white/60 px-2 py-0.5 text-xs font-bold dark:bg-black/20">
-                    {columnJobs.length}
-                  </span>
-                  {status === 'rejected' && onHideRejected && (
+              <ColumnHead
+                title={config.label}
+                titleClass={config.color}
+                pillClass={COLUMN_HEADER_BG[status]}
+                borderClass={config.border}
+                count={columnJobs.length}
+                extra={
+                  status === 'rejected' && onHideRejected ? (
                     <button
                       type="button"
                       onClick={onHideRejected}
-                      className="text-xs font-medium text-red-600/80 hover:underline dark:text-red-400"
+                      className="text-xs font-medium text-red-600/80 hover:underline"
                     >
                       Hide
                     </button>
-                  )}
-                </div>
-              </div>
+                  ) : null
+                }
+              />
               <div
-                className={`min-h-[7rem] space-y-2 rounded-lg transition ${
+                className={`-mt-2 min-h-[7rem] space-y-2 rounded-lg transition ${
                   isTarget ? 'bg-track-accent/5 ring-2 ring-inset ring-track-accent/30' : ''
                 }`}
               >
@@ -120,13 +163,14 @@ export function KanbanBoard({
 
         {showTrash && (
           <div className="min-w-[260px] flex-1">
-            <div className="sticky top-0 z-10 mb-3 flex items-center justify-between rounded-lg border border-slate-300 bg-slate-100/95 px-3 py-2 backdrop-blur-sm dark:border-track-600 dark:bg-track-900/95">
-              <h2 className="text-sm font-semibold text-slate-600 dark:text-slate-300">Trash</h2>
-              <div className="flex items-center gap-2">
-                <span className="rounded-full bg-white/60 px-2 py-0.5 text-xs font-bold dark:bg-black/20">
-                  {visibleTrash.length}
-                </span>
-                {onHideTrash && (
+            <ColumnHead
+              title="Trash"
+              titleClass="text-slate-600"
+              pillClass="bg-slate-200"
+              borderClass="border-slate-300"
+              count={visibleTrash.length}
+              extra={
+                onHideTrash ? (
                   <button
                     type="button"
                     onClick={onHideTrash}
@@ -134,10 +178,10 @@ export function KanbanBoard({
                   >
                     Hide
                   </button>
-                )}
-              </div>
-            </div>
-            <div className="min-h-[7rem] space-y-2">
+                ) : null
+              }
+            />
+            <div className="-mt-2 min-h-[7rem] space-y-2">
               {visibleTrash.length === 0 ? (
                 <p className="rounded-lg border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400 dark:border-track-700">
                   {searching ? 'No matches in trash' : 'No deleted jobs'}

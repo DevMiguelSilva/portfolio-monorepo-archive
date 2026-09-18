@@ -21,3 +21,9 @@ export const btnSecondaryClass =
 
 export const btnGhostClass =
   'rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50'
+
+export const btnInterviewClass =
+  'rounded-lg bg-amber-500 px-3 py-2 text-sm font-medium text-white transition hover:bg-amber-600'
+
+export const btnRejectedClass =
+  'rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700'
