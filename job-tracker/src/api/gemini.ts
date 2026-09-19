@@ -20,6 +20,8 @@ export interface TailorCvResult {
   experience?: MasterCv['experience']
   projects?: MasterCv['projects']
   coverLetter?: string
+  /** Set by the server when a fallback model wrote the draft. */
+  tailorModel?: string
 }
 
 export async function tailorMasterCv(

@@ -224,8 +224,9 @@ Skills: ${Array.isArray(job.extractedSkills) ? job.extractedSkills.join(', ') : 
 Requirements: ${Array.isArray(job.extractedRequirements) ? job.extractedRequirements.join('; ') : ''}
 Description:
 ${String(job.jobDescription || '').slice(0, 3500)}`
-      const text = await generateGeminiTailorText(prompt, env, { maxOutputTokens: 8192 })
-      return ok({ result: extractJsonObject(text) })
+      const { text, model } = await generateGeminiTailorText(prompt, env, { maxOutputTokens: 8192 })
+      const result = extractJsonObject<Record<string, unknown>>(text)
+      return ok({ result: { ...result, tailorModel: model } })
     }
 
     return fail(400, `Unknown action: ${input.action}`)
