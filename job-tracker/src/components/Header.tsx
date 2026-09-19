@@ -102,16 +102,6 @@ export function Header() {
       {menuOpen && (
         <div id="mobile-nav" className="border-t border-slate-200/80 px-4 pb-3 sm:hidden">
           <nav className="flex flex-col gap-0.5 py-2">
-            <NavLink to="/" className={mobileNavLinkClass} end>
-              Board
-            </NavLink>
-            <NavLink to="/portals" className={mobileNavLinkClass}>
-              Portals
-            </NavLink>
-            <NavLink to="/inbox" className={mobileNavLinkClass}>
-              Inbox
-              <InboxBadge count={newCount} />
-            </NavLink>
             <NavLink to="/add" className={mobileNavLinkClass}>
               Add
             </NavLink>
