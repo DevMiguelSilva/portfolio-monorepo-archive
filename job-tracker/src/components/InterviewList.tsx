@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { formControlClass } from '../lib/formUi'
+import { getErrorMessage } from '../lib/errorMessage'
 import {
   formatInterviewDate,
   isUpcomingInterview,
@@ -37,20 +38,17 @@ export function InterviewList({ interviews, readOnly = false, onSave, embedded =
   }
 
   const persist = async (next: InterviewRound[]) => {
-    const wasAdding = adding
-    const wasEditing = editingId
+    if (saving) return
     setSaving(true)
     setError(null)
-    setAdding(false)
-    setEditingId(null)
     try {
       await onSave(next)
+      setAdding(false)
+      setEditingId(null)
       setLabelDraft('')
       setDateDraft('')
     } catch (err) {
-      setAdding(wasAdding)
-      setEditingId(wasEditing)
-      setError(err instanceof Error ? err.message : 'Could not save interviews')
+      setError(getErrorMessage(err, 'Could not save interviews'))
     } finally {
       setSaving(false)
     }
@@ -104,8 +102,9 @@ export function InterviewList({ interviews, readOnly = false, onSave, embedded =
         {!readOnly && !adding && !editingId && (
           <button
             type="button"
+            disabled={saving}
             onClick={startAdd}
-            className={`${interviewBtn} px-3 py-1.5 text-sm`}
+            className={`${interviewBtn} px-3 py-1.5 text-sm disabled:opacity-50`}
           >
             Add interview
           </button>
@@ -165,6 +164,7 @@ export function InterviewList({ interviews, readOnly = false, onSave, embedded =
                       <button
                         type="button"
                         aria-pressed={round.done}
+                        disabled={saving}
                         onClick={() =>
                           void persist(
                             interviews.map((item) =>
@@ -172,7 +172,7 @@ export function InterviewList({ interviews, readOnly = false, onSave, embedded =
                             )
                           )
                         }
-                        className={`px-2.5 py-1 text-xs ${
+                        className={`px-2.5 py-1 text-xs disabled:opacity-50 ${
                           round.done
                             ? 'rounded-lg border border-emerald-200 bg-emerald-50 font-semibold text-emerald-700'
                             : interviewBtn
@@ -182,15 +182,17 @@ export function InterviewList({ interviews, readOnly = false, onSave, embedded =
                       </button>
                       <button
                         type="button"
+                        disabled={saving}
                         onClick={() => startEdit(round)}
-                        className={`${quietBtn} px-2.5 py-1 text-xs`}
+                        className={`${quietBtn} px-2.5 py-1 text-xs disabled:opacity-50`}
                       >
                         Edit
                       </button>
                       <button
                         type="button"
+                        disabled={saving}
                         onClick={() => void persist(interviews.filter((item) => item.id !== round.id))}
-                        className={`${removeBtn} px-2.5 py-1 text-xs`}
+                        className={`${removeBtn} px-2.5 py-1 text-xs disabled:opacity-50`}
                       >
                         Remove
                       </button>
@@ -252,6 +254,7 @@ function DraftFields({
       <label className="block">
         <span className="text-xs text-brand-muted">Name</span>
         <input
+          disabled={saving}
           value={labelDraft}
           onChange={(e) => onLabel(e.target.value)}
           placeholder="Screen, technical, final…"
@@ -262,6 +265,7 @@ function DraftFields({
         <span className="text-xs text-brand-muted">Date</span>
         <input
           type="date"
+          disabled={saving}
           value={dateDraft}
           onChange={(e) => onDate(e.target.value)}
           className={formControlClass}

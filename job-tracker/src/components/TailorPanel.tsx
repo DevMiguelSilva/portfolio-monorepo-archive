@@ -2,6 +2,7 @@ import { Fragment, useMemo, useRef, useState } from 'react'
 import { explainSkill, tailorMasterCv } from '../api/gemini'
 import { downloadApplicationPack, openCvPrintWindow } from '../lib/docxExport'
 import { buildGapReport } from '../lib/matchScore'
+import { getErrorMessage } from '../lib/errorMessage'
 import { suggestTransferableSkills, transferCheck, transferDifficultyClass, transferDifficultyLabel } from '../lib/skillTransfer'
 import type { GapReport, GapSkill, MasterCv, TailoredDocument } from '../types/cv'
 import {
@@ -159,7 +160,7 @@ export function TailorPanel({ job }: TailorPanelProps) {
     try {
       await fn()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Request failed')
+      setError(getErrorMessage(err, 'Request failed'))
     } finally {
       setLoading(null)
     }
@@ -183,10 +184,10 @@ export function TailorPanel({ job }: TailorPanelProps) {
   const runGap = () =>
     run('gap', async () => {
       const gap = computeGap(claimedSkills)
-      setGapReport(gap)
-      setPanelOpen('gap', true)
       await updateJob(job.id, { matchScore: gap.coveragePercent })
       if (tailoredCv) await persist(tailoredCv, coverLetter, gap)
+      setGapReport(gap)
+      setPanelOpen('gap', true)
     })
 
   const toggleClaimedSkill = async (skill: string) => {
@@ -205,7 +206,7 @@ export function TailorPanel({ job }: TailorPanelProps) {
       })
       if (tailoredCv) await persist(tailoredCv, coverLetter, gap)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save claimed skill')
+      setError(getErrorMessage(err, 'Failed to save claimed skill'))
     }
   }
 
@@ -293,7 +294,7 @@ export function TailorPanel({ job }: TailorPanelProps) {
     } catch (err) {
       if (request !== explainRequest.current) return
       setExplanation(null)
-      setExplainError(err instanceof Error ? err.message : 'Could not look that up')
+      setExplainError(getErrorMessage(err, 'Could not look that up'))
     } finally {
       if (request === explainRequest.current) setExplainLoading(false)
     }
