@@ -45,11 +45,13 @@ export async function explainSkill(skill: string): Promise<string> {
 
 export async function parseResumeText(
   resumeText: string,
-  track: 'frontend' | 'powerPlatform'
+  track: string,
+  templateName?: string
 ): Promise<Partial<MasterCv>> {
   return callGemini<Partial<MasterCv>>({
     action: 'parseResume',
     resumeText,
     track,
+    templateName,
   })
 }

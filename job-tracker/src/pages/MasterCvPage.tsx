@@ -1,5 +1,8 @@
-import { useEffect, useState } from 'react'
-import { PageToolbar } from '../components/PageToolbar'
+import { useEffect, useRef, useState } from 'react'
+import { useJobs } from '../hooks/useJobs'
+import { useSavedSearches } from '../hooks/useSavedSearches'
+import { templateReferences } from '../lib/cvLibrary'
+import { getErrorMessage } from '../lib/errorMessage'
 import { parseResumeText } from '../api/gemini'
 import { useMasterCv } from '../hooks/useMasterCv'
 import {
@@ -9,8 +12,7 @@ import {
   splitEducationAndCerts,
 } from '../lib/resumeImport'
 import {
-  CV_TRACK_LABELS,
-  CV_TRACKS,
+  type ResumeAttachment,
   type CvCertification,
   type CvEducation,
   type CvExperience,
@@ -20,6 +22,10 @@ import {
   type MasterCv,
 } from '../types/cv'
 
+const card = 'min-w-0 space-y-4 rounded-2xl border border-[#e6eeeb] bg-white p-5 sm:p-6'
+const button = 'rounded-lg border border-[#e6eeeb] bg-white px-4 py-2 text-sm font-semibold text-brand-ink transition hover:bg-brand-mist disabled:opacity-50'
+const field = 'w-full min-w-0 rounded-lg border border-[#e6eeeb] bg-white px-3 py-2 text-sm text-brand-ink outline-none focus:border-brand-primary'
+
 export function MasterCvPage() {
   const {
     library,
@@ -27,8 +33,7 @@ export function MasterCvPage() {
     loading,
     setActiveTrack,
     getCv,
-    saveTrackCv,
-    saveAttachment,
+    saveTemplate, getLabel, addTemplate, renameTemplate, deleteTemplate, loadError, reload,
   } = useMasterCv()
   const [editingTrack, setEditingTrack] = useState<CvTrack>(activeTrack)
   const [draft, setDraft] = useState<MasterCv | null>(null)
@@ -36,35 +41,63 @@ export function MasterCvPage() {
   const [importing, setImporting] = useState(false)
   const [importError, setImportError] = useState<string | null>(null)
   const [importNote, setImportNote] = useState<string | null>(null)
+  const { jobs } = useJobs()
+  const { searches } = useSavedSearches()
+  const [busy, setBusy] = useState(false)
+  const [showAdd, setShowAdd] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [copyFrom, setCopyFrom] = useState('')
+  const [rename, setRename] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<string | null>(null)
+  const [replacement, setReplacement] = useState('')
+  const [pendingAttachment, setPendingAttachment] = useState<ResumeAttachment | undefined>()
+  const dialog = useRef<HTMLDialogElement>(null)
+  useEffect(() => { if (deleting) dialog.current?.showModal(); else dialog.current?.close() }, [deleting])
 
   useEffect(() => {
     setEditingTrack(activeTrack)
     setDraft(null)
+    setPendingAttachment(undefined)
+    setRename(null)
+    setImportNote(null)
+    setSaved(false)
   }, [activeTrack])
 
   const cv = draft ?? getCv(editingTrack)
   const attachment = library.attachments[editingTrack]
   const setCv = (next: MasterCv) => setDraft(next)
 
-  const switchTrack = async (track: CvTrack) => {
-    if (draft) {
-      await saveTrackCv(editingTrack, draft)
-      setDraft(null)
-    }
-    setEditingTrack(track)
-    await setActiveTrack(track)
+  const run = async (action: () => Promise<void>) => {
+    setBusy(true)
+    setImportError(null)
+    try { await action() }
+    catch (error) { setImportError(getErrorMessage(error, 'Could not save. Your draft is still here.')) }
+    finally { setBusy(false) }
   }
+  const saveDraft = async () => { if (draft) await saveTemplate(editingTrack, draft, pendingAttachment) }
+  const switchTrack = (track: CvTrack) => run(async () => {
+    await saveDraft()
+    await setActiveTrack(track)
+    setDraft(null)
+    setPendingAttachment(undefined)
+  })
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
-    await saveTrackCv(editingTrack, cv)
-    setDraft(null)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+    if (!cv) return
+    await run(async () => {
+      await saveTemplate(editingTrack, cv, pendingAttachment)
+      setDraft(null)
+      setPendingAttachment(undefined)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    })
   }
 
   const handleUpload = async (file: File | null) => {
-    if (!file) return
+    if (!file || !cv || busy || importing) return
+    const target = editingTrack
+    const base = cv
     setImporting(true)
     setImportError(null)
     setImportNote(null)
@@ -72,17 +105,18 @@ export function MasterCvPage() {
       const text = await extractTextFromResumeFile(file)
       if (!text.trim()) throw new Error('No text could be extracted from that file.')
 
-      await saveAttachment(editingTrack, {
+      const importedAttachment = {
         fileName: file.name,
         mimeType: file.type || 'application/octet-stream',
         uploadedAt: new Date().toISOString(),
         extractedText: text,
-      })
+      }
+      setPendingAttachment(importedAttachment)
 
-      let next = sparseCvFromText(text, getCv(editingTrack))
+      let next = sparseCvFromText(text, base)
       try {
-        const parsed = await parseResumeText(text, editingTrack)
-        next = mergeParsedCv(getCv(editingTrack), parsed)
+        const parsed = await parseResumeText(text, target, getLabel(target))
+        next = mergeParsedCv(base, parsed)
         setImportNote('Resume imported into the form. Review fields and save when ready.')
       } catch {
         setImportNote(
@@ -91,74 +125,84 @@ export function MasterCvPage() {
       }
 
       setDraft(next)
-      await saveTrackCv(editingTrack, next)
+      await saveTemplate(target, next, importedAttachment)
+      setDraft(null)
+      setPendingAttachment(undefined)
     } catch (err) {
-      setImportError(err instanceof Error ? err.message : 'Import failed')
+      setImportError(getErrorMessage(err, 'Import failed. Your draft is still here.'))
     } finally {
       setImporting(false)
     }
   }
 
   if (loading) {
-    return <p className="text-sm text-slate-500">Loading master CV…</p>
+    return <p className="text-sm text-brand-muted">Loading master CV…</p>
   }
 
+  if (loadError || !cv) return <div className={card}><p role="alert">{loadError ?? 'CV template unavailable.'}</p><button className={button} onClick={() => void reload()}>Retry loading CVs</button></div>
+  const locked = busy || importing
+  const refs = deleting ? templateReferences(library, deleting, jobs, searches) : { jobs: [], searches: [] }
+  const needsReplacement = refs.jobs.length + refs.searches.length > 0
+
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <PageToolbar title="Master CVs" />
-
-      <div className="flex flex-wrap gap-2">
-        {CV_TRACKS.map((track) => (
-          <button
-            key={track}
-            type="button"
-            onClick={() => switchTrack(track)}
-            className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-              editingTrack === track
-                ? 'bg-sky-600 text-white shadow-sm'
-                : 'border border-slate-200 text-slate-600 hover:border-sky-200 hover:text-sky-600'
-            }`}
-          >
-            {CV_TRACK_LABELS[track]}
-            {library.activeTrack === track && (
-              <span className="ml-2 text-xs opacity-80">active</span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      <section className="space-y-3 rounded-xl border border-dashed border-slate-300 bg-white p-5 dark:border-track-700 dark:bg-track-800">
-        <h2 className="font-semibold">Attach resume → fill form</h2>
+    <div className="mx-auto min-w-0 max-w-3xl space-y-6 text-brand-ink">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div><h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">CV library</h1><p className="mt-2 text-sm text-brand-muted">Keep a master CV for each kind of role you apply to.</p></div>
+        <button type="button" className={button} disabled={locked} onClick={() => setShowAdd(!showAdd)}>+ New CV</button>
+      </header>
+      {importError && <div className="space-y-2 rounded-lg bg-red-50 p-3 text-sm text-red-700"><p role="alert">{importError}</p><button type="button" disabled={locked} className={button} onClick={() => void run(reload)}>Reload library</button></div>}
+      {showAdd && <form className={card} onSubmit={(e) => { e.preventDefault(); void run(async () => { await saveDraft(); await addTemplate(newName, copyFrom || undefined); setNewName(''); setShowAdd(false) }) }}>
+        <h2 className="break-words font-display text-lg font-semibold text-brand-ink">New CV template</h2>
+        <label className="block text-sm text-brand-muted">Template name<input required disabled={locked} className={`${field} mt-1`} value={newName} onChange={(e) => setNewName(e.target.value)} /></label>
+        <label className="block text-sm text-brand-muted">Start from<select className={`${field} mt-1`} disabled={locked} value={copyFrom} onChange={(e) => setCopyFrom(e.target.value)}><option value="">Blank CV</option>{Object.keys(library.cvs).map((id) => <option key={id} value={id}>{getLabel(id)}</option>)}</select></label>
+        <div className="flex min-w-0 gap-2"><button className={button} disabled={locked || !newName.trim()}>Create CV</button><button type="button" className={button} disabled={locked} onClick={() => setShowAdd(false)}>Cancel</button></div>
+      </form>}
+      <section className={card}>
+        <label className="block text-sm font-medium">Selected CV<select aria-label="Selected CV" disabled={locked} className={`${field} mt-2`} value={editingTrack} onChange={(e) => void switchTrack(e.target.value)}>{Object.keys(library.cvs).map((id) => <option key={id} value={id}>{getLabel(id)}</option>)}</select></label>
+        <div className="flex flex-wrap items-center gap-2"><span className="mr-auto text-xs text-brand-muted">Used by default for new applications</span><button type="button" className={button} disabled={locked} onClick={() => setRename(getLabel(editingTrack))}>Rename</button><button type="button" className={`${button} text-red-700`} disabled={locked || Object.keys(library.cvs).length <= 1} onClick={() => { setReplacement(''); setDeleting(editingTrack) }}>Delete</button></div>
+        {rename !== null && <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); void run(async () => { await renameTemplate(editingTrack, rename); setRename(null) }) }}><label className="block text-sm">Template name<input className={`${field} mt-1`} required disabled={locked} value={rename} onChange={(e) => setRename(e.target.value)} /></label><div className="flex min-w-0 gap-2"><button className={button} disabled={locked || !rename.trim()}>Save name</button><button type="button" className={button} disabled={locked} onClick={() => setRename(null)}>Cancel</button></div></form>}
+      </section>
+      <dialog ref={dialog} onCancel={(e) => { if (locked) e.preventDefault(); else setDeleting(null) }} className="w-[calc(100%-2rem)] max-w-lg rounded-2xl border border-[#e6eeeb] bg-white p-6 text-brand-ink backdrop:bg-brand-ink/30">
+        {deleting && <div className="min-w-0 space-y-4"><h2 className="break-words text-xl font-semibold">Delete {getLabel(deleting)}?</h2><p className="text-sm text-brand-muted">This removes the template and its attached resume. Submitted application documents stay saved.</p>
+          {needsReplacement && <><p className="text-sm">Choose a replacement for these saved references:</p><ul className="max-h-40 space-y-1 overflow-auto text-sm">{refs.jobs.map((job) => <li key={job.id} className="break-words">Job: {job.role} at {job.company}</li>)}{refs.searches.map((search) => <li key={search.id} className="break-words">Search: {search.label || search.query}</li>)}</ul></>}
+          <label className="block text-sm">Replacement CV{!needsReplacement && ' (optional)'}<select aria-label="Replacement CV" className={`${field} mt-1`} disabled={locked} value={replacement} onChange={(e) => setReplacement(e.target.value)}><option value="">{needsReplacement ? 'Choose a CV' : 'Use another remaining CV'}</option>{Object.keys(library.cvs).filter((id) => id !== deleting).map((id) => <option key={id} value={id}>{getLabel(id)}</option>)}</select></label>
+          {importError && <p role="alert" className="text-sm text-red-700">{importError}</p>}
+          <div className="flex flex-wrap gap-2"><button className={`${button} text-red-700`} disabled={locked || (needsReplacement && !replacement)} onClick={() => void run(async () => { await deleteTemplate(deleting, replacement || undefined); setDeleting(null); setDraft(null); setPendingAttachment(undefined) })}>{busy ? 'Deleting…' : 'Delete template'}</button><button className={button} disabled={locked} onClick={() => setDeleting(null)}>Cancel</button></div>
+        </div>}
+      </dialog>
+      <fieldset disabled={locked} className="min-w-0 space-y-6">
+      <section className="min-w-0 space-y-4 rounded-2xl border border-[#e6eeeb] bg-white p-5 sm:p-6">
+        <h2 className="break-words font-display text-lg font-semibold text-brand-ink">Attach resume → fill form</h2>
         <input
           type="file"
           accept=".docx,.txt,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-          disabled={importing}
+          disabled={locked}
           onChange={(e) => handleUpload(e.target.files?.[0] ?? null)}
-          className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-track-accent file:px-3 file:py-2 file:text-sm file:font-medium file:text-white"
+          className="block w-full text-sm text-brand-muted file:mr-3 file:rounded-lg file:border-0 file:bg-brand-primary file:px-3 file:py-2 file:text-sm file:font-medium file:text-white"
         />
         {attachment && (
-          <p className="text-xs text-slate-500">
+          <p className="break-words text-xs text-brand-muted">
             Stored: <span className="font-medium">{attachment.fileName}</span> ·{' '}
             {new Date(attachment.uploadedAt).toLocaleString()} ·{' '}
             {attachment.extractedText.length.toLocaleString()} chars extracted
           </p>
         )}
-        {importing && <p className="text-sm text-track-accent">Importing…</p>}
+        {importing && <p className="text-sm text-brand-primaryDeep">Importing…</p>}
         {importError && (
-          <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-300">
+          <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
             {importError}
           </p>
         )}
         {importNote && (
-          <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">
+          <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">
             {importNote}
           </p>
         )}
       </section>
 
       <form onSubmit={handleSave} className="space-y-6">
-        <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 dark:border-track-700 dark:bg-track-800">
-          <h2 className="font-semibold">Contact · {CV_TRACK_LABELS[editingTrack]}</h2>
+        <section className="min-w-0 space-y-4 rounded-2xl border border-[#e6eeeb] bg-white p-5 sm:p-6">
+          <h2 className="break-words font-display text-lg font-semibold text-brand-ink">Contact · {getLabel(editingTrack)}</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             {(
               [
@@ -175,7 +219,7 @@ export function MasterCvPage() {
                   onChange={(e) =>
                     setCv({ ...cv, contact: { ...cv.contact, [key]: e.target.value } })
                   }
-                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 dark:border-track-700 dark:bg-track-900"
+                  className="mt-1 min-w-0 w-full rounded-lg border border-[#e6eeeb] px-3 py-2"
                 />
               </label>
             ))}
@@ -196,7 +240,7 @@ export function MasterCvPage() {
                   },
                 })
               }
-              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 dark:border-track-700 dark:bg-track-900"
+              className="mt-1 min-w-0 w-full rounded-lg border border-[#e6eeeb] px-3 py-2"
             />
           </label>
           <label className="block text-sm">
@@ -204,7 +248,7 @@ export function MasterCvPage() {
             <input
               value={cv.headline}
               onChange={(e) => setCv({ ...cv, headline: e.target.value })}
-              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 dark:border-track-700 dark:bg-track-900"
+              className="mt-1 min-w-0 w-full rounded-lg border border-[#e6eeeb] px-3 py-2"
             />
           </label>
           <label className="block text-sm">
@@ -213,7 +257,7 @@ export function MasterCvPage() {
               value={cv.summary}
               onChange={(e) => setCv({ ...cv, summary: e.target.value })}
               rows={5}
-              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 dark:border-track-700 dark:bg-track-900"
+              className="mt-1 min-w-0 w-full rounded-lg border border-[#e6eeeb] px-3 py-2"
             />
           </label>
         </section>
@@ -240,11 +284,12 @@ export function MasterCvPage() {
 
         <button
           type="submit"
-          className="w-full rounded-lg bg-track-accent py-2.5 text-sm font-semibold text-white hover:bg-sky-600"
+          disabled={locked} className="w-full break-words rounded-lg bg-brand-primary py-2.5 text-sm font-semibold text-white hover:bg-brand-primaryDeep"
         >
-          {saved ? '✓ Saved' : `Save ${CV_TRACK_LABELS[editingTrack]} CV`}
+          {saved ? '✓ Saved' : `Save ${getLabel(editingTrack)} CV`}
         </button>
       </form>
+      </fieldset>
     </div>
   )
 }
@@ -257,12 +302,12 @@ function SkillGroupsEditor({
   onChange: (skills: CvSkillGroup[]) => void
 }) {
   return (
-    <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 dark:border-track-700 dark:bg-track-800">
-      <div className="flex items-center justify-between">
-        <h2 className="font-semibold">Skills</h2>
+    <section className="min-w-0 space-y-4 rounded-2xl border border-[#e6eeeb] bg-white p-5 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="break-words font-display text-lg font-semibold text-brand-ink">Skills</h2>
         <button
           type="button"
-          className="text-sm text-track-accent hover:underline"
+          className={button}
           onClick={() =>
             onChange([...skills, { id: crypto.randomUUID(), group: 'Group', items: [] }])
           }
@@ -271,8 +316,8 @@ function SkillGroupsEditor({
         </button>
       </div>
       {skills.map((group, index) => (
-        <div key={group.id} className="space-y-2 rounded-lg border border-slate-200 p-3 dark:border-track-700">
-          <div className="flex gap-2">
+        <div key={group.id} className="space-y-2 rounded-lg border border-[#e6eeeb] p-3">
+          <div className="flex min-w-0 gap-2">
             <input
               value={group.group}
               onChange={(e) => {
@@ -280,7 +325,7 @@ function SkillGroupsEditor({
                 next[index] = { ...group, group: e.target.value }
                 onChange(next)
               }}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-track-700 dark:bg-track-900"
+              className="min-w-0 w-full rounded-lg border border-[#e6eeeb] px-3 py-2 text-sm"
             />
             <button
               type="button"
@@ -304,7 +349,7 @@ function SkillGroupsEditor({
               onChange(next)
             }}
             placeholder="React, TypeScript, …"
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-track-700 dark:bg-track-900"
+            className="min-w-0 w-full rounded-lg border border-[#e6eeeb] px-3 py-2 text-sm"
           />
         </div>
       ))}
@@ -319,7 +364,7 @@ function RemoveCardButton({ onClick, label }: { onClick: () => void; label: stri
       onClick={onClick}
       aria-label={label}
       title={label}
-      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:border-track-700 dark:hover:border-red-900 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#e6eeeb] text-brand-muted transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
     >
       <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4" aria-hidden>
         <path
@@ -340,12 +385,12 @@ function ExperienceEditor({
   onChange: (experience: CvExperience[]) => void
 }) {
   return (
-    <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 dark:border-track-700 dark:bg-track-800">
-      <div className="flex items-center justify-between">
-        <h2 className="font-semibold">Experience</h2>
+    <section className="min-w-0 space-y-4 rounded-2xl border border-[#e6eeeb] bg-white p-5 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="break-words font-display text-lg font-semibold text-brand-ink">Experience</h2>
         <button
           type="button"
-          className="text-sm text-track-accent hover:underline"
+          className={button}
           onClick={() =>
             onChange([
               ...experience,
@@ -366,9 +411,9 @@ function ExperienceEditor({
         </button>
       </div>
       {experience.map((exp, index) => (
-        <div key={exp.id} className="space-y-2 rounded-lg border border-slate-200 p-3 dark:border-track-700">
+        <div key={exp.id} className="space-y-2 rounded-lg border border-[#e6eeeb] p-3">
           <div className="flex items-start justify-between gap-2">
-            <p className="pt-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
+            <p className="pt-1.5 text-xs font-medium uppercase tracking-wide text-brand-muted">
               Role {index + 1}
             </p>
             <RemoveCardButton
@@ -385,7 +430,7 @@ function ExperienceEditor({
                 next[index] = { ...exp, title: e.target.value }
                 onChange(next)
               }}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-track-700 dark:bg-track-900"
+              className="min-w-0 rounded-lg border border-[#e6eeeb] px-3 py-2 text-sm"
             />
             <input
               value={exp.company}
@@ -395,7 +440,7 @@ function ExperienceEditor({
                 next[index] = { ...exp, company: e.target.value }
                 onChange(next)
               }}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-track-700 dark:bg-track-900"
+              className="min-w-0 rounded-lg border border-[#e6eeeb] px-3 py-2 text-sm"
             />
             <input
               value={exp.location}
@@ -405,9 +450,9 @@ function ExperienceEditor({
                 next[index] = { ...exp, location: e.target.value }
                 onChange(next)
               }}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-track-700 dark:bg-track-900"
+              className="min-w-0 rounded-lg border border-[#e6eeeb] px-3 py-2 text-sm"
             />
-            <div className="flex gap-2">
+            <div className="flex min-w-0 gap-2">
               <input
                 value={exp.start}
                 placeholder="Start"
@@ -416,7 +461,7 @@ function ExperienceEditor({
                   next[index] = { ...exp, start: e.target.value }
                   onChange(next)
                 }}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-track-700 dark:bg-track-900"
+                className="min-w-0 w-full rounded-lg border border-[#e6eeeb] px-3 py-2 text-sm"
               />
               <input
                 value={exp.end}
@@ -427,7 +472,7 @@ function ExperienceEditor({
                   next[index] = { ...exp, end: e.target.value }
                   onChange(next)
                 }}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-track-700 dark:bg-track-900"
+                className="min-w-0 w-full rounded-lg border border-[#e6eeeb] px-3 py-2 text-sm"
               />
             </div>
           </div>
@@ -462,7 +507,7 @@ function ExperienceEditor({
             }}
             rows={4}
             placeholder="One bullet per line"
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-track-700 dark:bg-track-900"
+            className="min-w-0 w-full rounded-lg border border-[#e6eeeb] px-3 py-2 text-sm"
           />
         </div>
       ))}
@@ -478,12 +523,12 @@ function ProjectsEditor({
   onChange: (projects: CvProject[]) => void
 }) {
   return (
-    <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 dark:border-track-700 dark:bg-track-800">
-      <div className="flex items-center justify-between">
-        <h2 className="font-semibold">Projects</h2>
+    <section className="min-w-0 space-y-4 rounded-2xl border border-[#e6eeeb] bg-white p-5 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="break-words font-display text-lg font-semibold text-brand-ink">Projects</h2>
         <button
           type="button"
-          className="text-sm text-track-accent hover:underline"
+          className={button}
           onClick={() =>
             onChange([
               ...projects,
@@ -500,9 +545,9 @@ function ProjectsEditor({
         </button>
       </div>
       {projects.map((project, index) => (
-        <div key={project.id} className="space-y-2 rounded-lg border border-slate-200 p-3 dark:border-track-700">
+        <div key={project.id} className="space-y-2 rounded-lg border border-[#e6eeeb] p-3">
           <div className="flex items-start justify-between gap-2">
-            <p className="pt-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
+            <p className="pt-1.5 text-xs font-medium uppercase tracking-wide text-brand-muted">
               Project {index + 1}
             </p>
             <RemoveCardButton
@@ -518,7 +563,7 @@ function ProjectsEditor({
               next[index] = { ...project, name: e.target.value }
               onChange(next)
             }}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-track-700 dark:bg-track-900"
+            className="min-w-0 w-full rounded-lg border border-[#e6eeeb] px-3 py-2 text-sm"
           />
           <input
             value={project.url}
@@ -528,7 +573,7 @@ function ProjectsEditor({
               next[index] = { ...project, url: e.target.value }
               onChange(next)
             }}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-track-700 dark:bg-track-900"
+            className="min-w-0 w-full rounded-lg border border-[#e6eeeb] px-3 py-2 text-sm"
           />
           <textarea
             value={project.bullets.map((b) => b.text).join('\n')}
@@ -548,7 +593,7 @@ function ProjectsEditor({
               onChange(next)
             }}
             rows={3}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-track-700 dark:bg-track-900"
+            className="min-w-0 w-full rounded-lg border border-[#e6eeeb] px-3 py-2 text-sm"
           />
         </div>
       ))}
@@ -571,16 +616,16 @@ function EducationEditor({
   const movable = education.length - preview.education.length
 
   return (
-    <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 dark:border-track-700 dark:bg-track-800">
+    <section className="min-w-0 space-y-4 rounded-2xl border border-[#e6eeeb] bg-white p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="font-semibold">Education</h2>
+          <h2 className="break-words font-display text-lg font-semibold text-brand-ink">Education</h2>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {movable > 0 && (
             <button
               type="button"
-              className="text-sm font-medium text-amber-700 hover:underline dark:text-amber-300"
+              className="text-sm font-medium text-amber-700 hover:underline"
               onClick={onSplitCerts}
             >
               Move {movable} cert{movable === 1 ? '' : 's'} → Certifications
@@ -588,7 +633,7 @@ function EducationEditor({
           )}
           <button
             type="button"
-            className="text-sm text-track-accent hover:underline"
+            className={button}
             onClick={() =>
               onChange([
                 ...education,
@@ -601,9 +646,9 @@ function EducationEditor({
         </div>
       </div>
       {education.map((edu, index) => (
-        <div key={edu.id} className="space-y-2 rounded-lg border border-slate-200 p-3 dark:border-track-700">
+        <div key={edu.id} className="space-y-2 rounded-lg border border-[#e6eeeb] p-3">
           <div className="flex items-start justify-between gap-2">
-            <p className="pt-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
+            <p className="pt-1.5 text-xs font-medium uppercase tracking-wide text-brand-muted">
               Education {index + 1}
             </p>
             <RemoveCardButton
@@ -620,7 +665,7 @@ function EducationEditor({
                 next[index] = { ...edu, degree: e.target.value }
                 onChange(next)
               }}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-track-700 dark:bg-track-900"
+              className="min-w-0 rounded-lg border border-[#e6eeeb] px-3 py-2 text-sm"
             />
             <input
               value={edu.school}
@@ -630,7 +675,7 @@ function EducationEditor({
                 next[index] = { ...edu, school: e.target.value }
                 onChange(next)
               }}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-track-700 dark:bg-track-900"
+              className="min-w-0 rounded-lg border border-[#e6eeeb] px-3 py-2 text-sm"
             />
             <input
               value={edu.start ?? ''}
@@ -640,7 +685,7 @@ function EducationEditor({
                 next[index] = { ...edu, start: e.target.value }
                 onChange(next)
               }}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-track-700 dark:bg-track-900"
+              className="min-w-0 rounded-lg border border-[#e6eeeb] px-3 py-2 text-sm"
             />
             <input
               value={edu.end ?? ''}
@@ -650,7 +695,7 @@ function EducationEditor({
                 next[index] = { ...edu, end: e.target.value }
                 onChange(next)
               }}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-track-700 dark:bg-track-900"
+              className="min-w-0 rounded-lg border border-[#e6eeeb] px-3 py-2 text-sm"
             />
           </div>
         </div>
@@ -667,14 +712,14 @@ function CertificationsEditor({
   onChange: (certifications: CvCertification[]) => void
 }) {
   return (
-    <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 dark:border-track-700 dark:bg-track-800">
-      <div className="flex items-center justify-between">
+    <section className="min-w-0 space-y-4 rounded-2xl border border-[#e6eeeb] bg-white p-5 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-semibold">Certifications</h2>
+          <h2 className="break-words font-display text-lg font-semibold text-brand-ink">Certifications</h2>
         </div>
         <button
           type="button"
-          className="text-sm text-track-accent hover:underline"
+          className={button}
           onClick={() =>
             onChange([
               ...certifications,
@@ -686,9 +731,9 @@ function CertificationsEditor({
         </button>
       </div>
       {certifications.map((cert, index) => (
-        <div key={cert.id} className="space-y-2 rounded-lg border border-slate-200 p-3 dark:border-track-700">
+        <div key={cert.id} className="space-y-2 rounded-lg border border-[#e6eeeb] p-3">
           <div className="flex items-start justify-between gap-2">
-            <p className="pt-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
+            <p className="pt-1.5 text-xs font-medium uppercase tracking-wide text-brand-muted">
               Certification {index + 1}
             </p>
             <RemoveCardButton
@@ -705,7 +750,7 @@ function CertificationsEditor({
                 next[index] = { ...cert, name: e.target.value }
                 onChange(next)
               }}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-track-700 dark:bg-track-900 sm:col-span-1"
+              className="min-w-0 rounded-lg border border-[#e6eeeb] px-3 py-2 text-sm sm:col-span-1"
             />
             <input
               value={cert.issuer}
@@ -715,7 +760,7 @@ function CertificationsEditor({
                 next[index] = { ...cert, issuer: e.target.value }
                 onChange(next)
               }}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-track-700 dark:bg-track-900"
+              className="min-w-0 rounded-lg border border-[#e6eeeb] px-3 py-2 text-sm"
             />
             <input
               value={cert.year}
@@ -725,7 +770,7 @@ function CertificationsEditor({
                 next[index] = { ...cert, year: e.target.value }
                 onChange(next)
               }}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-track-700 dark:bg-track-900"
+              className="min-w-0 rounded-lg border border-[#e6eeeb] px-3 py-2 text-sm"
             />
           </div>
         </div>

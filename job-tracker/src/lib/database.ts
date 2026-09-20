@@ -108,12 +108,12 @@ export interface TailoredDocumentRow {
 }
 
 function asCvTrack(value: string | null | undefined): CvTrack | null {
-  if (value === 'frontend' || value === 'powerPlatform') return value
+  if (typeof value === 'string' && value.trim() && value !== 'auto') return value
   return null
 }
 
 function asSearchTrack(value: string | null | undefined): SearchTrack {
-  if (value === 'frontend' || value === 'powerPlatform' || value === 'auto') return value
+  if (typeof value === 'string' && value.trim()) return value
   return 'auto'
 }
 

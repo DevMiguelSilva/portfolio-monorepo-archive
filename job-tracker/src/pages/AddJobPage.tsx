@@ -6,7 +6,7 @@ import { LoadingSpinner } from '../components/LoadingSpinner'
 import { useJobs } from '../hooks/useJobs'
 import { useMasterCv } from '../hooks/useMasterCv'
 import { scoreMasterCvAgainstJob, withRequirementSignals } from '../lib/matchScore'
-import { CV_TRACK_LABELS, CV_TRACKS, type CvTrack } from '../types/cv'
+import { type CvTrack } from '../types/cv'
 import {
   createEmptyJob,
   guessJobSourceFromUrl,
@@ -24,9 +24,9 @@ const fieldControl =
 export function AddJobPage() {
   const navigate = useNavigate()
   const { addJob } = useJobs()
-  const { getCv, activeTrack } = useMasterCv()
+  const { getCv, activeTrack, library, getLabel } = useMasterCv()
   const [form, setForm] = useState(() =>
-    createEmptyJob({ cvTrack: activeTrack, source: 'indeed', status: 'saved' })
+    createEmptyJob({ cvTrack: null, source: 'indeed', status: 'saved' })
   )
   const [pasteText, setPasteText] = useState('')
   const [parsing, setParsing] = useState(false)
@@ -83,9 +83,11 @@ export function AddJobPage() {
     try {
       const fullJd = form.jobDescription.trim() || pasteText.trim()
       const track = form.cvTrack ?? activeTrack
+      const selectedCv = getCv(track)
+      if (!selectedCv) throw new Error('Choose an existing CV template before saving.')
       const described = `${form.role}\n${fullJd}`
       const extractedSkills = withRequirementSignals(described, form.extractedSkills)
-      const match = scoreMasterCvAgainstJob(described, getCv(track), extractedSkills)
+      const match = scoreMasterCvAgainstJob(described, selectedCv, extractedSkills)
       await addJob({
         ...form,
         status: 'saved',
@@ -108,7 +110,7 @@ export function AddJobPage() {
     : 'indeed'
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
+    <div className="mx-auto max-w-3xl space-y-4">
       <div className="space-y-3">
         <Link to="/" className="text-sm font-medium text-brand-muted hover:text-brand-ink">
           ← Back to board
@@ -224,9 +226,9 @@ export function AddJobPage() {
               onChange={(e) => update('cvTrack', e.target.value as CvTrack)}
               className={`${fieldControl} form-select`}
             >
-              {CV_TRACKS.map((track) => (
+              {Object.keys(library.cvs).map((track) => (
                 <option key={track} value={track}>
-                  {CV_TRACK_LABELS[track]}
+                  {getLabel(track)}
                 </option>
               ))}
             </select>

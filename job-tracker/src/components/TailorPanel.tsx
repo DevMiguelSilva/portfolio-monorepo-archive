@@ -1,3 +1,4 @@
+import { resolveJobCv } from '../lib/cvLibrary'
 import { Fragment, useMemo, useRef, useState } from 'react'
 import { explainSkill, tailorMasterCv } from '../api/gemini'
 import { downloadApplicationPack, openCvPrintWindow } from '../lib/docxExport'
@@ -6,7 +7,6 @@ import { getErrorMessage } from '../lib/errorMessage'
 import { suggestTransferableSkills, transferCheck, transferDifficultyClass, transferDifficultyLabel } from '../lib/skillTransfer'
 import type { GapReport, GapSkill, MasterCv, TailoredDocument } from '../types/cv'
 import {
-  CV_TRACK_LABELS,
   EMPTY_GAP_REPORT,
   lockSkillGroupsToMaster,
   masterCvSearchText,
@@ -110,10 +110,18 @@ function SkillAnswer({
 }
 
 export function TailorPanel({ job }: TailorPanelProps) {
+  const { library, loading, loadError, getLabel } = useMasterCv()
+  const { getForJob, loading: docsLoading } = useTailoredDocs()
+  const doc = getForJob(job.id)
+  const masterCv = resolveJobCv(library, job, doc)
+  if (loading || docsLoading) return <p className="text-sm text-brand-muted">Loading application documents…</p>
+  if (job.status === 'saved' && loadError) return <p role="alert" className="text-sm text-red-700">{loadError}</p>
+  if (!masterCv) return <section className="rounded-2xl border border-[#e6eeeb] bg-white p-5"><h2 className="font-semibold">Application document unavailable</h2><p className="mt-2 text-sm text-brand-muted">{job.status === 'saved' ? 'Choose an existing CV template for this saved job.' : 'This older application has no stored CV snapshot. Its original template cannot be substituted with a current CV.'}</p></section>
+  return <TailorPanelContent key={job.id} job={job} masterCv={masterCv} templateLabel={job.status === 'saved' ? getLabel(job.cvTrack ?? library.activeTrack) : 'Stored application'} />
+}
+
+function TailorPanelContent({ job, masterCv, templateLabel }: TailorPanelProps & { masterCv: MasterCv; templateLabel: string }) {
   const { updateJob } = useJobs()
-  const { getCv, activeTrack } = useMasterCv()
-  const track = job.cvTrack ?? activeTrack
-  const masterCv = getCv(track)
   const profile = masterCvToProfile(masterCv)
   const { getForJob, saveDoc } = useTailoredDocs()
   const existing = getForJob(job.id)
@@ -423,7 +431,7 @@ export function TailorPanel({ job }: TailorPanelProps) {
       <div>
         <h2 className="font-display text-base font-semibold text-brand-ink">ATS tailor & export</h2>
         <p className="mt-1 text-sm text-brand-muted">
-          Using <span className="text-brand-ink">{CV_TRACK_LABELS[track]}</span> master CV. One
+          Using <span className="text-brand-ink">{templateLabel}</span> master CV. One
           button writes the resume and the cover letter. Click it again to show or hide both.
           {skillsLocked
             ? ' Skill claims stay as they were when you applied.'

@@ -1,9 +1,11 @@
+import { CV_LIBRARY_EVENT, recoverCvTransaction } from '../lib/cvLibrary'
 import {
   createContext,
   useCallback,
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
@@ -19,7 +21,7 @@ import {
 } from '../lib/matchScore'
 import { expandSearchLocations } from '../lib/searchLocations'
 import { supabase } from '../lib/supabase'
-import { CV_TRACK_LABELS, type CvTrack, type MasterCv } from '../types/cv'
+import { type CvTrack, type MasterCv } from '../types/cv'
 import type { InboxJob, SavedSearch, SearchTrack } from '../types/job'
 import { createEmptyJob } from '../types/job'
 import { useAuth } from './useAuth'
@@ -57,6 +59,7 @@ interface InboxContextValue {
 const InboxContext = createContext<InboxContextValue | null>(null)
 
 function readLocal(): InboxJob[] {
+  recoverCvTransaction(localStorage)
   try {
     const stored = localStorage.getItem(LOCAL_KEY)
     const items = stored ? (JSON.parse(stored) as InboxJob[]) : []
@@ -78,20 +81,19 @@ function writeLocal(items: InboxJob[]) {
 function pickMatch(
   jobText: string,
   searchTrack: SearchTrack,
-  cvs: Record<CvTrack, MasterCv>
+  cvs: Record<CvTrack, MasterCv>,
+  names: Record<string, string>
 ): MatchResult & { track: CvTrack } {
   const dual = scoreDualTracks(jobText, cvs)
-  const track =
-    searchTrack === 'frontend' || searchTrack === 'powerPlatform'
-      ? searchTrack
-      : dual.bestTrack
-  const match = dual[track]
+  const track = searchTrack === 'auto' ? dual.bestTrack : searchTrack
+  const match = dual.scores[track]
+  if (!match) throw new Error('The selected CV is unavailable. Choose another CV for this search.')
   return {
     ...match,
     track,
     reasons: [
-      dualTrackReasonLine(dual),
-      `Best for apply: ${CV_TRACK_LABELS[dual.bestTrack]} (${dual.bestScore}%)`,
+      dualTrackReasonLine(dual, names),
+      `Best for apply: ${names[dual.bestTrack]} (${dual.bestScore}%)`,
       ...match.reasons,
     ],
   }
@@ -100,7 +102,9 @@ function pickMatch(
 export function InboxProvider({ children }: { children: ReactNode }) {
   const { user, isCloudEnabled } = useAuth()
   const { searches } = useSavedSearches()
-  const { library, getCv } = useMasterCv()
+  const { library } = useMasterCv()
+  const live = useRef({ library, searches })
+  live.current = { library, searches }
   const { addJob, jobs } = useJobs()
   const [inbox, setInbox] = useState<InboxJob[]>([])
   const [loading, setLoading] = useState(true)
@@ -108,13 +112,7 @@ export function InboxProvider({ children }: { children: ReactNode }) {
   const [refreshError, setRefreshError] = useState<string | null>(null)
   const isCloudSync = isCloudEnabled && Boolean(user)
 
-  const cvsByTrack = useMemo(
-    () => ({
-      frontend: getCv('frontend'),
-      powerPlatform: getCv('powerPlatform'),
-    }),
-    [getCv, library]
-  )
+  const cvsByTrack = library.cvs
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -139,7 +137,10 @@ export function InboxProvider({ children }: { children: ReactNode }) {
   }, [isCloudSync, user])
 
   useEffect(() => {
-    load()
+    void load()
+    const refresh = () => { void load() }
+    window.addEventListener(CV_LIBRARY_EVENT, refresh)
+    return () => window.removeEventListener(CV_LIBRARY_EVENT, refresh)
   }, [load])
 
   const persistAll = useCallback(
@@ -291,7 +292,7 @@ export function InboxProvider({ children }: { children: ReactNode }) {
           }
 
           const jobText = `${result.role}\n${result.description}`
-          const match = pickMatch(jobText, search.track ?? 'auto', cvsByTrack)
+          const match = pickMatch(jobText, search.track ?? 'auto', cvsByTrack, library.names)
           const prevMerged = merged.get(result.externalId)
           const seenCount = nextSeenCount(result.externalId, existing)
 
@@ -379,7 +380,7 @@ export function InboxProvider({ children }: { children: ReactNode }) {
     } finally {
       setRefreshing(false)
     }
-  }, [searches, inbox, jobs, cvsByTrack, persistAll])
+  }, [searches, inbox, jobs, cvsByTrack, library.names, persistAll])
 
   const updateInboxItem = useCallback(
     async (id: string, updates: Partial<InboxJob>) => {
@@ -406,8 +407,6 @@ export function InboxProvider({ children }: { children: ReactNode }) {
       const item = inbox.find((i) => i.id === id)
       if (!item) throw new Error('Inbox item not found')
 
-      const track = item.matchedTrack ?? 'powerPlatform'
-
       // Same job shape as manual add: keep full description text; AI fills summary/skills when possible.
       let jdSummary = ''
       let extractedSkills: string[] = []
@@ -433,8 +432,13 @@ export function InboxProvider({ children }: { children: ReactNode }) {
       }
 
       const jobText = `${role}\n${item.description}`
+      // Parsing can finish after a template was deleted or a search reassigned.
+      const latest = live.current
+      const search = latest.searches.find((entry) => entry.id === item.savedSearchId)
+      const currentMatch = pickMatch(jobText, search?.track ?? (item.matchedTrack && latest.library.cvs[item.matchedTrack] ? item.matchedTrack : 'auto'), latest.library.cvs, latest.library.names)
+      const track = currentMatch.track
       extractedSkills = withRequirementSignals(jobText, extractedSkills)
-      const coverage = scoreMasterCvAgainstJob(jobText, cvsByTrack[track], extractedSkills)
+      const coverage = scoreMasterCvAgainstJob(jobText, latest.library.cvs[track], extractedSkills)
 
       const job = createEmptyJob({
         company,
@@ -447,7 +451,7 @@ export function InboxProvider({ children }: { children: ReactNode }) {
         jdSummary,
         extractedSkills: extractedSkills.length ? extractedSkills : coverage.targets,
         extractedRequirements,
-        notes: `Approved from inbox (${item.source}). Match ${coverage.score}% · ${CV_TRACK_LABELS[track]}.`,
+        notes: `Approved from inbox (${item.source}). Match ${coverage.score}% · ${latest.library.names[track]}.`,
         source: item.source,
         externalId: item.externalId,
         savedSearchId: item.savedSearchId,
@@ -461,7 +465,7 @@ export function InboxProvider({ children }: { children: ReactNode }) {
       await updateInboxItem(id, { status: 'approved' })
       return job.id
     },
-    [inbox, cvsByTrack, addJob, updateInboxItem]
+    [inbox, addJob, updateInboxItem]
   )
 
   const dismissJob = useCallback(
@@ -473,9 +477,18 @@ export function InboxProvider({ children }: { children: ReactNode }) {
 
   const newCount = useMemo(() => inbox.filter((i) => i.status === 'new').length, [inbox])
 
+  const scoredInbox = useMemo(() => inbox.map((item) => {
+    if (item.status !== 'new') return item
+    const search = searches.find((entry) => entry.id === item.savedSearchId)
+    try {
+      const match = pickMatch(`${item.role}\n${item.description}`, search?.track ?? (item.matchedTrack && library.cvs[item.matchedTrack] ? item.matchedTrack : 'auto'), library.cvs, library.names)
+      return { ...item, matchedTrack: match.track, matchScore: match.score, matchReasons: match.reasons }
+    } catch { return { ...item, matchScore: 0, matchReasons: ['Selected CV unavailable. Update the saved search before approval.'] } }
+  }).sort((a, b) => b.matchScore - a.matchScore), [inbox, searches, library])
+
   const value = useMemo(
     () => ({
-      inbox,
+      inbox: scoredInbox,
       loading,
       refreshing,
       refreshError,
@@ -486,7 +499,7 @@ export function InboxProvider({ children }: { children: ReactNode }) {
       dismissJob,
     }),
     [
-      inbox,
+      scoredInbox,
       loading,
       refreshing,
       refreshError,

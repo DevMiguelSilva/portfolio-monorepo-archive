@@ -1,3 +1,4 @@
+import { CV_LIBRARY_EVENT, recoverCvTransaction } from '../lib/cvLibrary'
 import {
   createContext,
   useCallback,
@@ -78,6 +79,7 @@ function normalizeJob(
 }
 
 function readLocalJobs(): JobApplication[] {
+  recoverCvTransaction(localStorage)
   try {
     const stored = localStorage.getItem(LOCAL_STORAGE_KEY)
     if (!stored) return []
@@ -157,7 +159,10 @@ export function JobsProvider({ children }: { children: ReactNode }) {
   }, [isCloudSync, user])
 
   useEffect(() => {
-    loadJobs()
+    void loadJobs()
+    const refresh = () => { void loadJobs() }
+    window.addEventListener(CV_LIBRARY_EVENT, refresh)
+    return () => window.removeEventListener(CV_LIBRARY_EVENT, refresh)
   }, [loadJobs])
 
   const persistLocal = useCallback((next: JobApplication[]) => {
