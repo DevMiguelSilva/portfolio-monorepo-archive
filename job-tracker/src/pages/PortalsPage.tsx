@@ -1,23 +1,34 @@
 import { useState, type DragEvent } from 'react'
-import { PageToolbar } from '../components/PageToolbar'
+import { Link } from 'react-router-dom'
+import { boardLook } from '../components/BoardLook'
+import { IconAction } from '../components/IconAction'
 import { attachCardDragGhost } from '../components/JobCard'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { usePortalFeeds } from '../hooks/usePortalFeeds'
-import {
-  formControlClass,
-  formGridClass,
-  formLabelClass,
-  formPanelClass,
-  formPrimaryBtnClass,
-  formSelectClass,
-} from '../lib/formUi'
-import { btnPrimaryClass } from '../lib/appUi'
 import {
   PORTAL_SOURCE_LABELS,
   PORTAL_SOURCE_OPTIONS,
   type PortalFeed,
   type PortalSource,
 } from '../types/portal'
+
+const toolbarBtn =
+  'm-action rounded-lg border border-[#e6eeeb] bg-white px-4 py-2 text-sm font-semibold text-brand-ink transition hover:bg-[#f4faf8] disabled:opacity-60'
+const refreshBtn =
+  'm-action rounded-lg border border-[#e6eeeb] bg-white px-4 py-2 text-sm font-semibold text-brand-ink transition hover:border-brand-primary hover:bg-brand-mist disabled:opacity-60'
+const rowBtn =
+  'rounded-lg border border-[#e6eeeb] bg-white px-3 py-2 text-center text-sm font-semibold text-brand-ink transition hover:bg-[#f4faf8] disabled:opacity-60'
+const rowRun =
+  'rounded-lg border border-[#e6eeeb] bg-white px-3 py-2 text-center text-sm font-semibold text-brand-ink transition hover:border-brand-primary hover:bg-brand-mist disabled:opacity-60'
+const rowDanger =
+  'rounded-lg border border-[#e6eeeb] bg-white px-3 py-2 text-center text-sm font-semibold text-red-700 transition hover:border-red-200 hover:bg-red-50 disabled:opacity-60'
+const fieldLabel = 'text-sm text-brand-muted'
+const fieldControl =
+  'mt-1 w-full rounded-lg border border-[#e6eeeb] bg-white px-3 py-2 text-sm text-brand-ink outline-none transition focus:border-brand-primary'
+
+type FeedDraft = { name: string; url: string; source: PortalSource }
+
+const emptyDraft: FeedDraft = { name: '', url: '', source: 'indeed' }
 
 export function PortalsPage() {
   const {
@@ -34,32 +45,30 @@ export function PortalsPage() {
     openAllActive,
   } = usePortalFeeds()
 
-  const [draft, setDraft] = useState({ name: '', url: '', source: 'indeed' as PortalSource })
+  const [draft, setDraft] = useState<FeedDraft>(emptyDraft)
   const [showAddFeed, setShowAddFeed] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editDraft, setEditDraft] = useState({
-    name: '',
-    url: '',
-    source: 'indeed' as PortalSource,
-  })
+  const [editDraft, setEditDraft] = useState<FeedDraft>(emptyDraft)
+  const [busyFeedId, setBusyFeedId] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
 
-  const handleAdd = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleAdd = async (event: React.FormEvent) => {
+    event.preventDefault()
     setError(null)
+    setMessage(null)
     if (!draft.url.trim()) {
       setError('URL is required')
       return
     }
     try {
-      await addFeed(draft)
-      setDraft({ name: '', url: '', source: 'indeed' })
+      await addFeed({ ...draft, name: draft.name.trim(), url: draft.url.trim() })
+      setDraft(emptyDraft)
       setShowAddFeed(false)
       setMessage('Feed saved')
-      setTimeout(() => setMessage(null), 2000)
+      window.setTimeout(() => setMessage(null), 2000)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add feed')
     }
@@ -72,38 +81,100 @@ export function PortalsPage() {
       url: feed.url,
       source: feed.source === 'other' ? 'indeed' : feed.source,
     })
+    setError(null)
   }
 
-  const saveEdit = async (id: string) => {
-    await updateFeed(id, {
-      name: editDraft.name.trim() || 'Untitled feed',
-      url: editDraft.url.trim(),
-      source: editDraft.source,
-    })
-    setEditingId(null)
+  const saveEdit = async (event: React.FormEvent, id: string) => {
+    event.preventDefault()
+    setError(null)
+    setMessage(null)
+    setBusyFeedId(id)
+    try {
+      await updateFeed(id, {
+        name: editDraft.name.trim() || 'Untitled feed',
+        url: editDraft.url.trim(),
+        source: editDraft.source,
+      })
+      setEditingId(null)
+      setMessage('Feed updated')
+      window.setTimeout(() => setMessage(null), 2000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update feed')
+    } finally {
+      setBusyFeedId(null)
+    }
   }
 
   const handleOpenAll = async () => {
     setError(null)
     setMessage(null)
-    const { opened, blockedHint, remaining } = await openAllActive()
-    if (opened === 0) {
-      setMessage(
-        'Browser blocked the tabs. Allow pop-ups for this site, then try again.'
-      )
-      return
+    try {
+      const { opened, blockedHint, remaining } = await openAllActive()
+      if (opened === 0) {
+        setMessage('Browser blocked the tabs. Allow pop-ups for this site, then try again.')
+        return
+      }
+      if (blockedHint || remaining > 0) {
+        setMessage(
+          `Opened ${opened} and marked those checked.${
+            remaining > 0
+              ? ` ${remaining} still unchecked — click Open all again (or allow pop-ups to open more at once).`
+              : ' Allow pop-ups if you want every tab in one click.'
+          }`
+        )
+        return
+      }
+      setMessage(`Opened ${opened} portal(s) and marked them checked for today.`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to open active feeds')
     }
-    if (blockedHint || remaining > 0) {
-      setMessage(
-        `Opened ${opened} and marked those checked.${
-          remaining > 0
-            ? ` ${remaining} still unchecked — click Open all again (or allow pop-ups to open more at once).`
-            : ' Allow pop-ups if you want every tab in one click.'
-        }`
-      )
-      return
+  }
+
+  const handleOpenFeed = async (feed: PortalFeed) => {
+    setError(null)
+    setMessage(null)
+    try {
+      await openFeed(feed)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to open feed')
     }
-    setMessage(`Opened ${opened} portal(s) and marked them checked for today.`)
+  }
+
+  const handleToggleActive = async (feed: PortalFeed) => {
+    setError(null)
+    setMessage(null)
+    setBusyFeedId(feed.id)
+    try {
+      await updateFeed(feed.id, { active: !feed.active })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update feed')
+    } finally {
+      setBusyFeedId(null)
+    }
+  }
+
+  const handleDelete = async (feed: PortalFeed) => {
+    setError(null)
+    setMessage(null)
+    setBusyFeedId(feed.id)
+    try {
+      await deleteFeed(feed.id)
+      if (editingId === feed.id) setEditingId(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete feed')
+    } finally {
+      setBusyFeedId(null)
+    }
+  }
+
+  const handleToggleChecked = async (feed: PortalFeed) => {
+    setError(null)
+    setMessage(null)
+    try {
+      await toggleCheckedToday(feed.id)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update today’s checklist')
+    }
   }
 
   const handleFeedDragStart = (index: number, event: DragEvent<HTMLElement>) => {
@@ -143,142 +214,185 @@ export function PortalsPage() {
 
   if (loading) return <LoadingSpinner label="Loading portals…" />
 
+  const checkedActiveCount = activeFeeds.filter((feed) => todayCheckedIds.has(feed.id)).length
+
   return (
-    <div className="space-y-8">
-      <PageToolbar
-        title="Portals"
-        actions={
-          <button
-            type="button"
-            onClick={handleOpenAll}
-            disabled={activeFeeds.length === 0}
-            className={btnPrimaryClass}
-          >
-            Open all active ({activeFeeds.length})
-          </button>
-        }
-      />
+    <div className="space-y-4 font-sans text-brand-ink">
+      <div className="space-y-3">
+        <Link to="/" className="text-sm font-medium text-brand-muted hover:text-brand-ink">
+          ← Back to board
+        </Link>
+        <div className="m-action-row flex flex-wrap items-center justify-between gap-4">
+          <h1 className={boardLook.headline}>Portals</h1>
+          <div className="m-actions flex flex-wrap gap-2">
+            <button
+              type="button"
+              data-role="primary"
+              onClick={() => void handleOpenAll()}
+              disabled={activeFeeds.length === 0 || Boolean(busyFeedId)}
+              className={refreshBtn}
+            >
+              Open all active ({activeFeeds.length})
+            </button>
+          </div>
+        </div>
+      </div>
 
       {(message || error) && (
         <p
-          className={`rounded-lg p-3 text-sm ${
-            error
-              ? 'bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-300'
-              : 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300'
-          }`}
+          className={`text-sm ${error ? 'text-red-700' : 'text-brand-primaryDeep'}`}
+          role={error ? 'alert' : 'status'}
         >
           {error || message}
         </p>
       )}
 
-      <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 dark:border-track-700 dark:bg-track-800">
-        <h2 className="font-semibold">Your feeds</h2>
-        {feeds.length === 0 ? (
-          <p className="text-sm text-slate-500">
-            No feeds yet.
+      <section className={`${boardLook.card} space-y-4 p-4 sm:p-5`}>
+        <div className="space-y-1">
+          <h2 className="font-display text-base font-semibold text-brand-ink">Your feeds</h2>
+          <p className="text-xs text-brand-muted">
+            {checkedActiveCount} of {activeFeeds.length} active feeds checked today.
           </p>
+        </div>
+
+        {feeds.length === 0 ? (
+          <div className="rounded-[1.25rem] border border-dashed border-[#e6eeeb] bg-white p-8 text-center">
+            <h3 className="font-display text-lg font-semibold text-brand-ink">No portal feeds yet</h3>
+            <p className="mt-2 text-sm text-brand-muted">Add a job-search URL to keep it ready for your next search session.</p>
+          </div>
         ) : (
           <ul className="space-y-3">
             {feeds.map((feed, index) => {
               const checked = todayCheckedIds.has(feed.id)
+              const busy = busyFeedId === feed.id
+
               return (
                 <li
                   key={feed.id}
-                  onDragOver={(e) => handleFeedDragOver(index, e)}
+                  onDragOver={(event) => handleFeedDragOver(index, event)}
                   onDrop={() => void handleFeedDrop(index)}
-                  className={`rounded-lg border border-slate-200 p-3 dark:border-track-700 ${
+                  className={`rounded-[1.25rem] border border-[#e6eeeb] bg-white p-4 text-sm ${
                     dragIndex === index ? 'opacity-40' : ''
                   } ${
                     dropIndex === index && dragIndex != null && dragIndex !== index
-                      ? 'ring-2 ring-track-accent/40'
+                      ? 'ring-2 ring-brand-primary/40'
                       : ''
                   }`}
                 >
                   {editingId === feed.id ? (
-                    <div className="space-y-2.5">
+                    <form onSubmit={(event) => void saveEdit(event, feed.id)} className="space-y-2.5">
                       <FeedFields draft={editDraft} setDraft={setEditDraft} />
-                      <div className="flex flex-wrap gap-2">
+                      <div className="m-actions flex flex-wrap gap-2">
                         <button
-                          type="button"
-                          onClick={() => saveEdit(feed.id)}
-                          className="rounded-lg bg-track-accent px-3 py-1.5 text-xs font-medium text-white"
+                          type="submit"
+                          data-role="primary"
+                          disabled={busy}
+                          className={refreshBtn}
                         >
-                          Save
+                          {busy ? 'Saving…' : 'Save changes'}
                         </button>
                         <button
                           type="button"
-                          onClick={() => setEditingId(null)}
-                          className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs dark:border-track-700"
+                          data-role="quiet"
+                          onClick={() => {
+                            setEditingId(null)
+                            setError(null)
+                          }}
+                          className={toolbarBtn}
                         >
                           Cancel
                         </button>
                       </div>
-                    </div>
+                      <div className="search-mobile-only border-t border-[#e6eeeb] pt-3">
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void handleToggleActive(feed)}
+                          className={rowBtn}
+                        >
+                          {feed.active ? 'Pause' : 'Activate'}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void handleDelete(feed)}
+                          className={rowDanger}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </form>
                   ) : (
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="flex min-w-0 flex-1 items-center gap-2">
+                    <div className="search-row">
+                      <div className="flex min-w-0 items-center gap-2">
                         <button
                           type="button"
                           draggable
-                          onDragStart={(e) => handleFeedDragStart(index, e)}
+                          onDragStart={(event) => handleFeedDragStart(index, event)}
                           onDragEnd={handleFeedDragEnd}
-                          className="flex h-8 w-6 shrink-0 cursor-grab select-none items-center justify-center leading-none text-slate-400 active:cursor-grabbing"
+                          className="search-drag h-8 w-6 shrink-0 cursor-grab select-none items-center justify-center leading-none text-brand-muted active:cursor-grabbing"
                           title="Drag to reorder"
-                          aria-label={`Reorder ${feed.name}`}
+                          aria-label={`Reorder ${feed.name || 'portal feed'}`}
                         >
                           ⋮⋮
                         </button>
                         <input
                           type="checkbox"
                           checked={checked}
-                          disabled={!feed.active}
-                          onChange={() => toggleCheckedToday(feed.id)}
+                          disabled={!feed.active || busy}
+                          onChange={() => void handleToggleChecked(feed)}
                           className="h-4 w-4 shrink-0 accent-emerald-600"
                           title="Checked today"
+                          aria-label={`Mark ${feed.name || 'portal feed'} checked today`}
                         />
-                        <div className="min-w-0">
-                          <p className="font-medium">
-                            {feed.name}
-                            {!feed.active && (
-                              <span className="ml-2 text-xs text-slate-400">(paused)</span>
+                        <div className="min-w-0 text-left">
+                          <p className="font-medium text-brand-ink">
+                            {feed.name || 'Untitled feed'}
+                            {feed.active ? (
+                              <span className="ml-2 text-xs font-medium text-brand-primaryDeep">active</span>
+                            ) : (
+                              <span className="ml-2 text-xs text-brand-muted">paused</span>
                             )}
                             {checked && (
-                              <span className="ml-2 text-xs text-emerald-600">today ✓</span>
+                              <span className="ml-2 text-xs text-brand-primaryDeep">checked today ✓</span>
                             )}
                           </p>
-                          <p className="truncate text-xs text-slate-500">
+                          <p className="mt-1 truncate text-xs leading-relaxed text-brand-muted">
                             {PORTAL_SOURCE_LABELS[feed.source]} · {feed.url}
                           </p>
                         </div>
                       </div>
-                      <div className="flex flex-wrap items-center gap-2">
+
+                      <div className="search-icons">
+                        <IconAction label="Open" disabled={busy} onClick={() => void handleOpenFeed(feed)}>
+                          <ExternalLinkIcon />
+                        </IconAction>
+                        <IconAction label="Edit" onClick={() => startEdit(feed)}>
+                          <PencilIcon />
+                        </IconAction>
+                        <IconAction
+                          label={feed.active ? 'Pause' : 'Activate'}
+                          disabled={busy}
+                          onClick={() => void handleToggleActive(feed)}
+                        >
+                          {feed.active ? <PauseIcon /> : <PlayIcon />}
+                        </IconAction>
+                        <IconAction label="Delete" danger disabled={busy} onClick={() => void handleDelete(feed)}>
+                          <TrashIcon />
+                        </IconAction>
+                      </div>
+
+                      <div className="search-pair">
                         <button
                           type="button"
-                          onClick={() => openFeed(feed)}
-                          className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white dark:bg-slate-100 dark:text-slate-900"
+                          disabled={busy}
+                          onClick={() => void handleOpenFeed(feed)}
+                          className={rowRun}
                         >
                           Open
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => startEdit(feed)}
-                          className="text-xs text-track-accent hover:underline"
-                        >
+                        <button type="button" onClick={() => startEdit(feed)} className={rowBtn}>
                           Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => updateFeed(feed.id, { active: !feed.active })}
-                          className="text-xs text-track-accent hover:underline"
-                        >
-                          {feed.active ? 'Pause' : 'Activate'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => deleteFeed(feed.id)}
-                          className="text-xs text-red-500 hover:underline"
-                        >
-                          Delete
                         </button>
                       </div>
                     </div>
@@ -289,34 +403,31 @@ export function PortalsPage() {
           </ul>
         )}
 
-        <div className="border-t border-slate-200 pt-4 dark:border-track-700">
+        <div className="border-t border-[#e6eeeb] pt-4">
           {!showAddFeed ? (
-            <button
-              type="button"
-              onClick={() => setShowAddFeed(true)}
-              className="text-sm font-medium text-track-accent hover:underline"
-            >
-              + Add portal URL
+            <button type="button" onClick={() => setShowAddFeed(true)} className={toolbarBtn}>
+              Add portal feed
             </button>
           ) : (
-            <form onSubmit={handleAdd} className={formPanelClass}>
+            <form onSubmit={handleAdd} className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm font-semibold">New portal feed</p>
+                <p className="font-display text-base font-semibold text-brand-ink">New portal feed</p>
                 <button
                   type="button"
+                  data-role="quiet"
                   onClick={() => {
                     setShowAddFeed(false)
-                    setDraft({ name: '', url: '', source: 'indeed' })
+                    setDraft(emptyDraft)
                     setError(null)
                   }}
-                  className="text-xs text-slate-500 hover:underline"
+                  className={toolbarBtn}
                 >
                   Cancel
                 </button>
               </div>
               <FeedFields draft={draft} setDraft={setDraft} />
-              <div className="flex justify-end">
-                <button type="submit" className={formPrimaryBtnClass}>
+              <div className="m-actions flex flex-wrap gap-2">
+                <button type="submit" data-role="primary" className={refreshBtn}>
                   Save feed
                 </button>
               </div>
@@ -332,50 +443,87 @@ function FeedFields({
   draft,
   setDraft,
 }: {
-  draft: { name: string; url: string; source: PortalSource }
-  setDraft: React.Dispatch<
-    React.SetStateAction<{ name: string; url: string; source: PortalSource }>
-  >
+  draft: FeedDraft
+  setDraft: React.Dispatch<React.SetStateAction<FeedDraft>>
 }) {
   return (
-    <div className={formGridClass}>
+    <div className="search-fields">
       <label className="block">
-        <span className={formLabelClass}>Name</span>
+        <span className={fieldLabel}>Name</span>
         <input
           value={draft.name}
-          onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-          className={formControlClass}
+          onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
+          className={fieldControl}
         />
       </label>
       <label className="block">
-        <span className={formLabelClass}>Source</span>
+        <span className={fieldLabel}>Source</span>
         <select
-          value={PORTAL_SOURCE_OPTIONS.includes(
-            draft.source as (typeof PORTAL_SOURCE_OPTIONS)[number]
-          )
+          value={PORTAL_SOURCE_OPTIONS.includes(draft.source as (typeof PORTAL_SOURCE_OPTIONS)[number])
             ? draft.source
             : 'indeed'}
-          onChange={(e) => setDraft((d) => ({ ...d, source: e.target.value as PortalSource }))}
-          className={formSelectClass}
+          onChange={(event) => setDraft((current) => ({ ...current, source: event.target.value as PortalSource }))}
+          className={`${fieldControl} form-select`}
         >
-          {PORTAL_SOURCE_OPTIONS.map((s) => (
-            <option key={s} value={s}>
-              {PORTAL_SOURCE_LABELS[s]}
+          {PORTAL_SOURCE_OPTIONS.map((source) => (
+            <option key={source} value={source}>
+              {PORTAL_SOURCE_LABELS[source]}
             </option>
           ))}
         </select>
       </label>
-      <label className="block sm:col-span-2">
-        <span className={formLabelClass}>
-          URL <span className="text-red-500">*</span>
+      <label className="search-field-wide block">
+        <span className={fieldLabel}>
+          URL <span className="text-red-700">*</span>
         </span>
         <input
+          type="url"
           value={draft.url}
-          onChange={(e) => setDraft((d) => ({ ...d, url: e.target.value }))}
+          onChange={(event) => setDraft((current) => ({ ...current, url: event.target.value }))}
           required
-          className={formControlClass}
+          className={fieldControl}
         />
       </label>
     </div>
+  )
+}
+
+function ExternalLinkIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M9 3h4v4M13 3 7.5 8.5M11 8.5v4h-8v-8h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function PlayIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M5 3.5v9l8-4.5-8-4.5Z" fill="currentColor" />
+    </svg>
+  )
+}
+
+function PauseIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M4.5 3h2.2v10H4.5V3Zm4.8 0h2.2v10H9.3V3Z" fill="currentColor" />
+    </svg>
+  )
+}
+
+function PencilIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M9.2 3.3 12.7 6.8 5.5 14H2v-3.5l7.2-7.2Z" stroke="currentColor" strokeWidth="1.4" />
+    </svg>
+  )
+}
+
+function TrashIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M3.5 4.5h9M6 4.5V3h4v1.5M5 4.5l.5 8h5l.5-8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
   )
 }

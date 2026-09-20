@@ -33,6 +33,8 @@ interface JobsContextValue {
   restoreJob: (id: string) => Promise<void>
   /** Permanently remove from trash. */
   purgeJob: (id: string) => Promise<void>
+  /** Permanently remove every job in trash. */
+  emptyTrash: () => Promise<void>
   moveJob: (id: string, status: JobStatus) => Promise<void>
   getJob: (id: string) => JobApplication | undefined
   isCloudSync: boolean
@@ -69,7 +71,9 @@ function normalizeJob(
       jdComplete: job.jdComplete,
       source: job.source ?? 'manual',
     }),
+    needsRescore: job.needsRescore === true,
     deletedAt: job.deletedAt ?? null,
+    notSelected: job.notSelected === true,
   }
 }
 
@@ -225,6 +229,19 @@ export function JobsProvider({ children }: { children: ReactNode }) {
     [isCloudSync, jobs, persistLocal]
   )
 
+  const emptyTrash = useCallback(async () => {
+    const remaining = jobs.filter((job) => !job.deletedAt)
+    const ids = jobs.filter((job) => job.deletedAt).map((job) => job.id)
+    if (ids.length === 0) return
+    if (isCloudSync && supabase) {
+      const { error } = await supabase.from('job_applications').delete().in('id', ids)
+      if (error) throw error
+      setJobs(remaining)
+      return
+    }
+    persistLocal(remaining)
+  }, [isCloudSync, jobs, persistLocal])
+
   const moveJob = useCallback(
     async (id: string, status: JobStatus) => {
       const job = jobs.find((j) => j.id === id)
@@ -238,7 +255,11 @@ export function JobsProvider({ children }: { children: ReactNode }) {
           appliedDate = localDateKey()
         }
       }
-      await updateJob(id, { status, appliedDate })
+      await updateJob(id, {
+        status,
+        appliedDate,
+        ...(status !== 'interview' ? { notSelected: false } : {}),
+      })
     },
     [jobs, updateJob]
   )
@@ -259,6 +280,7 @@ export function JobsProvider({ children }: { children: ReactNode }) {
       deleteJob,
       restoreJob,
       purgeJob,
+      emptyTrash,
       moveJob,
       getJob,
       isCloudSync,
@@ -273,6 +295,7 @@ export function JobsProvider({ children }: { children: ReactNode }) {
       deleteJob,
       restoreJob,
       purgeJob,
+      emptyTrash,
       moveJob,
       getJob,
       isCloudSync,

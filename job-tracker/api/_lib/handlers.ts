@@ -3,6 +3,7 @@ import type { ServerEnv } from './env.js'
 import {
   extractJsonArray,
   extractJsonObject,
+  generateGeminiExplainText,
   generateGeminiLiteText,
   generateGeminiTailorText,
 } from './gemini.js'
@@ -55,7 +56,13 @@ export async function handleAdzunaSearch(body: unknown, env: ServerEnv): Promise
   }
 }
 
-type GeminiAction = 'parse' | 'parseResume' | 'coverLetter' | 'resumeBullets' | 'tailorCv'
+type GeminiAction =
+  | 'parse'
+  | 'parseResume'
+  | 'coverLetter'
+  | 'resumeBullets'
+  | 'tailorCv'
+  | 'explainSkill'
 
 export async function handleGemini(body: unknown, env: ServerEnv): Promise<ApiResult> {
   try {
@@ -68,6 +75,7 @@ export async function handleGemini(body: unknown, env: ServerEnv): Promise<ApiRe
       profile?: Record<string, unknown>
       masterCv?: Record<string, unknown>
       claimedSkills?: string[]
+      skill?: string
     }
 
     if (!input.action) return fail(400, 'action is required')
@@ -115,10 +123,15 @@ Return ONLY valid JSON with this exact shape (no markdown, no explanation):
   "role": "job title",
   "location": "city/region, Remote, or empty string",
   "salary": "salary/compensation range as written, or empty string if not stated",
-  "skills": ["concrete skills and tools mentioned — e.g. React, TypeScript"],
+  "skills": ["short requirements the candidate must already have"],
   "requirements": ["key requirements / qualifications from the posting"],
   "summary": "brief 2-3 sentence overview of the role for quick scanning"
 }
+Skill rules:
+- Include tools and technologies (Power Apps, React, SQL).
+- Include spoken languages whenever the posting requires them (French, Spanish, bilingual). Never drop a language because it seems basic, and never assume the candidate speaks it.
+- Include the role level when the person must already be that thing (Solution architect, Power Platform architect, Security architect). A job that needs an architect is not the same as a developer job that mentions working with one.
+- Keep each skill to a few words. Do not invent requirements that are not in the posting.
 
 Full job posting:
 ${input.description}`
@@ -227,6 +240,15 @@ ${String(job.jobDescription || '').slice(0, 3500)}`
       const { text, model } = await generateGeminiTailorText(prompt, env, { maxOutputTokens: 8192 })
       const result = extractJsonObject<Record<string, unknown>>(text)
       return ok({ result: { ...result, tailorModel: model } })
+    }
+
+    if (input.action === 'explainSkill') {
+      const skill = String(input.skill ?? '').trim()
+      if (!skill) return fail(400, 'skill is required')
+      const prompt = `Define "${skill}" in one or two short sentences, like a dictionary or a search snippet.
+Plain meaning only. Do not mention jobs, resumes, hiring, or whether someone should learn it.`
+      const text = await generateGeminiExplainText(prompt, env)
+      return ok({ result: text.replace(/^["']|["']$/g, '').trim() })
     }
 
     return fail(400, `Unknown action: ${input.action}`)

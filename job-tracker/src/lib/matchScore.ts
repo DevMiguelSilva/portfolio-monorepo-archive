@@ -184,16 +184,83 @@ function uniqueSkills(skills: string[]): string[] {
   return out
 }
 
+const SPOKEN_LANGUAGES: { label: string; pattern: RegExp }[] = [
+  { label: 'French', pattern: /\b(?:french|français|francais|francophone)\b/i },
+  { label: 'Spanish', pattern: /\b(?:spanish|español|espanol)\b/i },
+  { label: 'German', pattern: /\b(?:german|deutsch)\b/i },
+  { label: 'Mandarin', pattern: /\bmandarin\b/i },
+  { label: 'Cantonese', pattern: /\bcantonese\b/i },
+  { label: 'Portuguese', pattern: /\bportuguese\b/i },
+  { label: 'Italian', pattern: /\bitalian\b/i },
+  { label: 'Arabic', pattern: /\barabic\b/i },
+]
+
+const ARCHITECT_ROLES: { label: string; pattern: RegExp }[] = [
+  { label: 'Power Platform architect', pattern: /\bpower platform architect\b/i },
+  { label: 'Solution architect', pattern: /\bsolution architect\b/i },
+  { label: 'Enterprise architect', pattern: /\benterprise architect\b/i },
+  { label: 'Technical architect', pattern: /\btechnical architect\b/i },
+  { label: 'Software architect', pattern: /\bsoftware architect\b/i },
+  { label: 'Cloud architect', pattern: /\bcloud architect\b/i },
+  { label: 'Data architect', pattern: /\bdata architect\b/i },
+  { label: 'Security architect', pattern: /\bsecurity architect\b/i },
+]
+
+function architectLabel(text: string): string | null {
+  const specific = ARCHITECT_ROLES.find((role) => role.pattern.test(text))
+  if (specific) return specific.label
+  if (/\barchitect\b/i.test(text)) return 'Architect'
+  return null
+}
+
 /**
- * Keywords that appear in the JD — preferred extracted skills, else lexicon hits.
- * Denominator for honest coverage: what the posting asks for.
+ * Requirements the technical skill list often drops: spoken languages, and being
+ * an architect. These are not assumed — if the posting asks and the CV does not
+ * say it, the gap stays visible.
+ */
+export function requirementSignals(jobText: string): string[] {
+  const found: string[] = []
+  const add = (label: string) => {
+    if (!found.some((item) => normalize(item) === normalize(label))) found.push(label)
+  }
+
+  for (const language of SPOKEN_LANGUAGES) {
+    if (language.pattern.test(jobText)) add(language.label)
+  }
+  if (/\bbilingual\b|\bbilingue\b/i.test(jobText)) add('Bilingual')
+
+  const [title = '', ...rest] = jobText.split('\n')
+  const fromTitle = architectLabel(title)
+  if (fromTitle) add(fromTitle)
+
+  const body = rest.join('\n')
+  const candidateIsArchitect =
+    /\b(?:you(?:'|’)ll be|you will be|as an?|must be|required to be|experience as an?|background as an?|this role is|the role is)\s+(?:an?\s+|the\s+)?(?:senior\s+|lead\s+|principal\s+)?(?:power platform\s+|solution\s+|enterprise\s+|technical\s+|software\s+|cloud\s+|data\s+|security\s+)?architect\b/i
+  const hiringAnArchitect =
+    /\b(?:seeking|looking for|hiring)\s+(?:an?\s+)?(?:senior\s+|lead\s+|principal\s+)?(?:power platform\s+|solution\s+|enterprise\s+|technical\s+|software\s+|cloud\s+|data\s+|security\s+)?architect\b/i
+  if (candidateIsArchitect.test(body) || hiringAnArchitect.test(body)) {
+    const fromBody = architectLabel(body)
+    if (fromBody) add(fromBody)
+  }
+
+  return found
+}
+
+/** Extracted skills plus languages and role-level requirements found in the posting. */
+export function withRequirementSignals(jobText: string, skills: string[]): string[] {
+  return uniqueSkills([...skills, ...requirementSignals(jobText)])
+}
+
+/**
+ * Keywords that appear in the JD — extracted skills, plus languages and role
+ * requirements the extractor often skips. Lexicon hits only when nothing else was found.
  */
 export function deriveJdKeywords(
   jobText: string,
   extractedSkills: string[] = [],
   seedSkills: string[] = []
 ): string[] {
-  const extracted = uniqueSkills(extractedSkills)
+  const extracted = withRequirementSignals(jobText, extractedSkills)
   if (extracted.length > 0) return extracted
 
   const lexicon = uniqueSkills([...seedSkills, ...COMMON_JD_KEYWORDS])
@@ -346,6 +413,7 @@ export function buildGapReport(
   matchedKeywords: string[]
   claimedKeywords: string[]
   missingKeywords: string[]
+  skills: { skill: string; state: 'have' | 'added' | 'missing' }[]
   suggestions: string[]
 } {
   const cvText = Array.isArray(cvTextOrSkills) ? cvTextOrSkills.join('\n') : cvTextOrSkills
@@ -357,6 +425,7 @@ export function buildGapReport(
       matchedKeywords: [],
       claimedKeywords: [],
       missingKeywords: [],
+      skills: [],
       suggestions: ['Parse the job posting to extract skills for a better gap report.'],
     }
   }
@@ -375,6 +444,12 @@ export function buildGapReport(
   const matchedKeywords = result.matched
   const claimedKeywords = result.missing.filter(isClaimed)
   const missingKeywords = result.missing.filter((s) => !isClaimed(s))
+  const matchedKeys = new Set(matchedKeywords.map((skill) => skill.trim().toLowerCase().replace(/\s+/g, ' ')))
+  const skills = result.targets.map((skill) => {
+    const key = skill.trim().toLowerCase().replace(/\s+/g, ' ')
+    const state = matchedKeys.has(key) ? 'have' : isClaimed(skill) ? 'added' : 'missing'
+    return { skill, state } as const
+  })
   const coveragePercent = Math.round(
     ((matchedKeywords.length + claimedKeywords.length) / result.targets.length) * 100
   )
@@ -385,16 +460,6 @@ export function buildGapReport(
       : coveragePercent >= 45
         ? 'Partial overlap — apply if the missing items are real experience you can phrase honestly.'
         : 'Weak overlap — consider skipping unless you truly have the missing stack.',
-    ...(claimedKeywords.length > 0
-      ? [
-          `You confirmed ${claimedKeywords.length} skill(s) for this job — they’ll be included when you tailor.`,
-        ]
-      : []),
-    ...(missingKeywords.length > 0
-      ? [
-          'Amber chips are not on this master CV. Click one if you already know it, or use the transferable list when a missing skill is a short hop from skills you have.',
-        ]
-      : []),
   ]
 
   return {
@@ -402,6 +467,7 @@ export function buildGapReport(
     matchedKeywords,
     claimedKeywords,
     missingKeywords,
+    skills,
     suggestions,
   }
 }

@@ -1,18 +1,26 @@
 import { useState } from 'react'
-import { formControlClass, formLabelClass } from '../lib/formUi'
+import { formControlClass } from '../lib/formUi'
 import {
   formatInterviewDate,
   isUpcomingInterview,
   type InterviewRound,
 } from '../types/job'
 
+const quietBtn =
+  'rounded-lg border border-[#e6eeeb] bg-white font-semibold text-brand-ink transition hover:bg-[#f4faf8]'
+const interviewBtn =
+  'rounded-lg border border-[#e6eeeb] bg-white font-semibold text-brand-ink transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700'
+const removeBtn =
+  'rounded-lg border border-[#e6eeeb] bg-white font-semibold text-brand-muted transition hover:border-red-200 hover:bg-red-50 hover:text-red-700'
+
 interface InterviewListProps {
   interviews: InterviewRound[]
   readOnly?: boolean
   onSave: (next: InterviewRound[]) => Promise<void>
+  embedded?: boolean
 }
 
-export function InterviewList({ interviews, readOnly = false, onSave }: InterviewListProps) {
+export function InterviewList({ interviews, readOnly = false, onSave, embedded = false }: InterviewListProps) {
   const [adding, setAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [labelDraft, setLabelDraft] = useState('')
@@ -66,8 +74,12 @@ export function InterviewList({ interviews, readOnly = false, onSave }: Intervie
 
   const commitDraft = () => {
     const date = dateDraft.trim()
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return
     const label = labelDraft.trim()
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !label) {
+      setError('Add a name and a date for this interview.')
+      return
+    }
+    setError(null)
     if (editingId) {
       void persist(
         interviews.map((round) => (round.id === editingId ? { ...round, date, label } : round))
@@ -77,17 +89,23 @@ export function InterviewList({ interviews, readOnly = false, onSave }: Intervie
     void persist([...interviews, { id: crypto.randomUUID(), date, label, done: false }])
   }
 
-  const dateReady = /^\d{4}-\d{2}-\d{2}$/.test(dateDraft.trim())
+  const draftReady = /^\d{4}-\d{2}-\d{2}$/.test(dateDraft.trim()) && labelDraft.trim().length > 0
 
   return (
-    <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 dark:border-track-700 dark:bg-track-800">
+    <section
+      className={
+        embedded
+          ? 'space-y-3 border-t border-[#e6eeeb] pt-6'
+          : 'space-y-3 rounded-xl border border-slate-200 bg-white p-5 dark:border-track-700 dark:bg-track-800'
+      }
+    >
       <div className="flex items-center justify-between gap-3">
         <h2 className="font-semibold">Interviews</h2>
         {!readOnly && !adding && !editingId && (
           <button
             type="button"
             onClick={startAdd}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:border-sky-300 hover:text-sky-700 dark:border-track-600 dark:bg-track-900 dark:text-slate-200"
+            className={`${interviewBtn} px-3 py-1.5 text-sm`}
           >
             Add interview
           </button>
@@ -113,7 +131,7 @@ export function InterviewList({ interviews, readOnly = false, onSave }: Intervie
                   <DraftFields
                     labelDraft={labelDraft}
                     dateDraft={dateDraft}
-                    dateReady={dateReady}
+                    draftReady={draftReady}
                     saving={saving}
                     submitLabel="Save"
                     onLabel={setLabelDraft}
@@ -154,10 +172,10 @@ export function InterviewList({ interviews, readOnly = false, onSave }: Intervie
                             )
                           )
                         }
-                        className={`rounded-lg px-2.5 py-1 text-xs font-medium transition ${
+                        className={`px-2.5 py-1 text-xs ${
                           round.done
-                            ? 'bg-teal-600 text-white hover:bg-teal-700'
-                            : 'border border-slate-300 bg-white text-slate-600 hover:border-violet-300 hover:text-violet-700 dark:border-track-600 dark:bg-track-900 dark:text-slate-300'
+                            ? 'rounded-lg border border-emerald-200 bg-emerald-50 font-semibold text-emerald-700'
+                            : interviewBtn
                         }`}
                       >
                         {round.done ? 'Done' : 'Mark done'}
@@ -165,14 +183,14 @@ export function InterviewList({ interviews, readOnly = false, onSave }: Intervie
                       <button
                         type="button"
                         onClick={() => startEdit(round)}
-                        className="text-xs font-medium text-track-accent hover:underline"
+                        className={`${quietBtn} px-2.5 py-1 text-xs`}
                       >
                         Edit
                       </button>
                       <button
                         type="button"
                         onClick={() => void persist(interviews.filter((item) => item.id !== round.id))}
-                        className="text-xs font-medium text-slate-500 hover:text-red-600 hover:underline"
+                        className={`${removeBtn} px-2.5 py-1 text-xs`}
                       >
                         Remove
                       </button>
@@ -189,7 +207,7 @@ export function InterviewList({ interviews, readOnly = false, onSave }: Intervie
         <DraftFields
           labelDraft={labelDraft}
           dateDraft={dateDraft}
-          dateReady={dateReady}
+          draftReady={draftReady}
           saving={saving}
           submitLabel="Add"
           onLabel={setLabelDraft}
@@ -211,7 +229,7 @@ export function InterviewList({ interviews, readOnly = false, onSave }: Intervie
 function DraftFields({
   labelDraft,
   dateDraft,
-  dateReady,
+  draftReady,
   saving,
   submitLabel,
   onLabel,
@@ -221,7 +239,7 @@ function DraftFields({
 }: {
   labelDraft: string
   dateDraft: string
-  dateReady: boolean
+  draftReady: boolean
   saving: boolean
   submitLabel: string
   onLabel: (value: string) => void
@@ -230,9 +248,9 @@ function DraftFields({
   onCancel: () => void
 }) {
   return (
-    <div className="grid gap-2 rounded-xl border border-slate-200 p-3 sm:grid-cols-[1fr_11rem_auto] sm:items-end dark:border-track-700">
+    <div className="grid gap-2 rounded-xl border border-[#e6eeeb] p-3 sm:grid-cols-[1fr_11rem_auto] sm:items-end">
       <label className="block">
-        <span className={formLabelClass}>Round</span>
+        <span className="text-xs text-brand-muted">Name</span>
         <input
           value={labelDraft}
           onChange={(e) => onLabel(e.target.value)}
@@ -241,7 +259,7 @@ function DraftFields({
         />
       </label>
       <label className="block">
-        <span className={formLabelClass}>Date</span>
+        <span className="text-xs text-brand-muted">Date</span>
         <input
           type="date"
           value={dateDraft}
@@ -252,9 +270,9 @@ function DraftFields({
       <div className="flex gap-2">
         <button
           type="button"
-          disabled={!dateReady || saving}
+          disabled={!draftReady || saving}
           onClick={onSubmit}
-          className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-50"
+          className={`${interviewBtn} px-3 py-2 text-sm disabled:opacity-50`}
         >
           {saving ? 'Saving…' : submitLabel}
         </button>
@@ -262,7 +280,7 @@ function DraftFields({
           type="button"
           disabled={saving}
           onClick={onCancel}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-track-700"
+          className={`${quietBtn} px-3 py-2 text-sm disabled:opacity-50`}
         >
           Cancel
         </button>

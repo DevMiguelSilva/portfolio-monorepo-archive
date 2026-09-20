@@ -299,6 +299,24 @@ const GAP_FROM_ZERO = [
   'pytorch',
   'machine learning',
   'deep learning',
+  'french',
+  'spanish',
+  'german',
+  'mandarin',
+  'cantonese',
+  'portuguese',
+  'italian',
+  'arabic',
+  'bilingual',
+  'architect',
+  'solution architect',
+  'enterprise architect',
+  'power platform architect',
+  'technical architect',
+  'software architect',
+  'cloud architect',
+  'data architect',
+  'security architect',
 ]
 
 function skillKey(value: string): string {
@@ -357,6 +375,29 @@ function matchesAny(skill: string, aliases: string[]): boolean {
   return aliases.some((alias) => textHasSkill(skill, alias) || textHasSkill(alias, skill))
 }
 
+function isStandingRequirement(skill: string): boolean {
+  return matchesAny(skill, [
+    'french',
+    'spanish',
+    'german',
+    'mandarin',
+    'cantonese',
+    'portuguese',
+    'italian',
+    'arabic',
+    'bilingual',
+    'architect',
+    'solution architect',
+    'enterprise architect',
+    'power platform architect',
+    'technical architect',
+    'software architect',
+    'cloud architect',
+    'data architect',
+    'security architect',
+  ])
+}
+
 function heuristicBaseline(skill: string): TransferDifficulty | null {
   const n = normalize(skill)
   if (
@@ -391,16 +432,11 @@ function baselineFromZero(skill: string): TransferDifficulty {
   return 'moderate'
 }
 
-function easier(a: TransferDifficulty | null, b: TransferDifficulty | null): TransferDifficulty {
-  const list = [a, b].filter((value): value is TransferDifficulty => Boolean(value))
-  if (list.length === 0) return 'gap'
-  return list.sort((x, y) => DIFFICULTY_RANK[x] - DIFFICULTY_RANK[y])[0]
-}
-
+/** How hard it is to become proficient, not just to recognize the tool. */
 function difficultyFromFamilyCount(count: number): TransferDifficulty {
   if (count >= 3) return 'very-easy'
   if (count === 2) return 'easy'
-  return 'easy'
+  return 'moderate'
 }
 
 function difficultyFromCrossCount(count: number, rule: TransferDifficulty): TransferDifficulty {
@@ -412,10 +448,14 @@ function difficultyFromCrossCount(count: number, rule: TransferDifficulty): Tran
 }
 
 function baseLabelFor(difficulty: TransferDifficulty): string {
-  if (difficulty === 'very-easy' || difficulty === 'easy') return 'Everyday tool — quick to pick up'
-  if (difficulty === 'moderate') return 'Learnable without a CV match'
-  if (difficulty === 'hard') return 'New stack — real study time'
-  return 'No close skill on this CV'
+  if (difficulty === 'very-easy' || difficulty === 'easy') {
+    return 'Common tool. Practice is enough to get proficient.'
+  }
+  if (difficulty === 'moderate') {
+    return 'No close match on your CV. Proficiency will take some study.'
+  }
+  if (difficulty === 'hard') return 'New stack for you. Proficiency takes real study.'
+  return 'Nothing close on your CV.'
 }
 
 export function transferDifficultyLabel(difficulty: TransferDifficulty): string {
@@ -444,7 +484,8 @@ export function transferCheck(difficulty: TransferDifficulty): TransferCheck {
 }
 
 /**
- * Rank every missing JD skill: CV hop and from-zero learnability, take the easier.
+ * Rank every skill that is not already on the CV.
+ * Related experience sets how hard proficiency is. From-zero is only used with no close skill.
  * 1 Very easy · 2 Easy · 3 Moderate · 4 Hard · 5 Big gap
  */
 export function suggestTransferableSkills(
@@ -457,6 +498,17 @@ export function suggestTransferableSkills(
   const suggestions: TransferSuggestion[] = []
 
   for (const skill of missingKeywords) {
+    if (isStandingRequirement(skill)) {
+      suggestions.push({
+        skill,
+        relatedOwned: [],
+        baseLabel: 'The posting asks for this on its own.',
+        difficulty: 'gap',
+        checkIt: false,
+      })
+      continue
+    }
+
     const fromFamily = familyRelated(skill, owned)
     const fromCross = crossRelated(skill, owned)
     const relatedOwnedSkills = uniqueLabels([...fromFamily, ...(fromCross?.related ?? [])])
@@ -465,14 +517,13 @@ export function suggestTransferableSkills(
     let transfer: TransferDifficulty | null = null
     if (fromFamily.length > 0) {
       transfer = difficultyFromFamilyCount(fromFamily.length)
-      if (fromFamily.length === 1 && fromCross && fromCross.related.length >= 2) {
-        transfer = 'very-easy'
-      }
     } else if (fromCross && fromCross.related.length > 0) {
       transfer = difficultyFromCrossCount(fromCross.related.length, fromCross.difficulty)
     }
 
-    const difficulty = easier(transfer, baseline)
+    // With related experience, that hop is the proficiency estimate.
+    // From-zero only applies when the CV has nothing close.
+    const difficulty = transfer ?? baseline
     const check = transferCheck(difficulty)
     suggestions.push({
       skill,

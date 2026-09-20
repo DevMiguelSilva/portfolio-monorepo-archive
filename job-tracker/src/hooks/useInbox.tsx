@@ -14,6 +14,7 @@ import {
   dualTrackReasonLine,
   scoreDualTracks,
   scoreMasterCvAgainstJob,
+  withRequirementSignals,
   type MatchResult,
 } from '../lib/matchScore'
 import { expandSearchLocations } from '../lib/searchLocations'
@@ -432,6 +433,7 @@ export function InboxProvider({ children }: { children: ReactNode }) {
       }
 
       const jobText = `${role}\n${item.description}`
+      extractedSkills = withRequirementSignals(jobText, extractedSkills)
       const coverage = scoreMasterCvAgainstJob(jobText, cvsByTrack[track], extractedSkills)
 
       const job = createEmptyJob({

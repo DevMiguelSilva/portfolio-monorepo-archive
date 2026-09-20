@@ -1,9 +1,9 @@
 import type { DragEvent } from 'react'
 import { Link } from 'react-router-dom'
 import type { JobApplication } from '../types/job'
-import { interviewBoardLine, isUpcomingInterview, latestInterviewFollowUp } from '../types/job'
-import { InterviewFollowUpBadge } from './InterviewFollowUpBadge'
-import { SourceBadge } from './SourceBadge'
+import { jobSourceLabel, latestInterviewFollowUp } from '../types/job'
+import { BOARD_TONE } from '../lib/boardTone'
+import { boardLook } from './BoardLook'
 
 interface JobCardProps {
   job: JobApplication
@@ -24,9 +24,16 @@ export function JobCard({
   onRestore,
   onPurge,
 }: JobCardProps) {
-  const interviewLine = job.status === 'interview' ? interviewBoardLine(job.interviews) : null
   const followUp = job.status === 'interview' ? latestInterviewFollowUp(job.interviews) : null
-  const hasUpcoming = job.interviews.some((round) => isUpcomingInterview(round))
+  const company = job.company || 'Unknown company'
+  const pay = job.salary.trim()
+  const showPay =
+    pay.length > 0 &&
+    (job.status === 'interview' ||
+      job.status === 'offer' ||
+      (job.status === 'rejected' && job.interviews.length > 0))
+  const location = job.location.trim()
+  const tone = BOARD_TONE[trashMode ? 'trash' : job.status]
 
   return (
     <article
@@ -36,65 +43,56 @@ export function JobCard({
         onDragStart?.(job.id, e)
       }}
       onDragEnd={() => onDragEnd?.()}
-      className={`rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-sm shadow-slate-200/40 transition hover:border-sky-200 hover:shadow-md hover:shadow-sky-100/40 ${
+      className={`${boardLook.jobCard} min-w-0 ${tone.edge} ${
         trashMode ? '' : 'cursor-grab active:cursor-grabbing'
       } ${isDragging ? 'opacity-40' : ''}`}
     >
-      <Link to={`/job/${job.id}`} draggable={false} className="block space-y-2">
-        <div>
-          <h3 className="font-semibold leading-snug text-slate-900">{job.role || 'Untitled role'}</h3>
-          <p className="text-sm text-slate-500">{job.company || 'Unknown company'}</p>
-        </div>
-        {job.location && <p className="text-xs text-slate-400">📍 {job.location}</p>}
-        {interviewLine && (
-          <p className={`text-xs font-medium ${hasUpcoming ? 'text-sky-700' : 'text-slate-500'}`}>
-            {interviewLine}
-          </p>
-        )}
-        {job.extractedSkills.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {job.extractedSkills.slice(0, 3).map((skill) => (
-              <span
-                key={skill}
-                className="rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-medium text-sky-700"
-              >
-                {skill}
-              </span>
-            ))}
-            {job.extractedSkills.length > 3 && (
-              <span className="text-[10px] text-slate-400">+{job.extractedSkills.length - 3}</span>
-            )}
-          </div>
-        )}
-        <div className="flex flex-wrap items-center gap-1.5">
-          <SourceBadge source={job.source} />
-          {followUp && <InterviewFollowUpBadge outcome={followUp} />}
-          {!job.jdComplete && (
-            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">
-              JD incomplete
+      <Link to={`/job/${job.id}`} draggable={false} className="block min-w-0 space-y-2">
+        <div className="space-y-0.5">
+          <div className="flex items-start justify-between gap-2">
+            <h3 className={`${boardLook.jobTitle} min-w-0 break-words`}>{job.role || 'Untitled role'}</h3>
+            <span className="shrink-0 pt-0.5 text-[11px] font-medium text-brand-muted">
+              {jobSourceLabel(job.source)}
             </span>
+          </div>
+          <p className={boardLook.jobMeta}>{company}</p>
+          {location && <p className={`${boardLook.jobMeta} truncate`}>{location}</p>}
+          {showPay && <p className={boardLook.jobMeta}>{pay}</p>}
+          {job.status === 'interview' && job.notSelected && (
+            <p className="truncate pt-1 text-[11px] font-semibold text-brand-muted">Not selected</p>
+          )}
+          {job.status === 'interview' && !job.notSelected && followUp === 'waiting' && (
+            <p className="truncate pt-1 text-[11px] font-semibold text-emerald-700">
+              Waiting for an answer
+            </p>
+          )}
+          {job.status === 'interview' && !job.notSelected && followUp === 'pending' && (
+            <p className="truncate pt-1 text-[11px] font-semibold text-emerald-700">Interview booked</p>
+          )}
+          {!job.jdComplete && !job.needsRescore && (
+            <p className="pt-1 text-[11px] font-semibold text-[#8a6230]">Description incomplete</p>
           )}
         </div>
       </Link>
       {trashMode && (
-        <div className="mt-2 flex flex-wrap gap-2 border-t border-slate-100 pt-2">
+        <div className="mt-3 grid grid-cols-2 gap-2">
           <button
             type="button"
             onClick={() => onRestore?.(job.id)}
-            className="text-xs font-medium text-sky-600 hover:underline"
+            className={`rounded-lg px-2 py-1.5 text-xs font-semibold transition ${BOARD_TONE.saved.action}`}
           >
             Restore
           </button>
           <button
             type="button"
             onClick={() => {
-              if (confirm(`Permanently delete ${job.role} at ${job.company}?`)) {
+              if (confirm(`Permanently delete ${job.role} at ${job.company}? This cannot be undone.`)) {
                 onPurge?.(job.id)
               }
             }}
-            className="text-xs font-medium text-red-500 hover:underline"
+            className="rounded-lg border border-[#e6eeeb] bg-white px-2 py-1.5 text-xs font-semibold text-brand-muted transition hover:border-red-200 hover:text-red-700"
           >
-            Delete forever
+            Delete
           </button>
         </div>
       )}

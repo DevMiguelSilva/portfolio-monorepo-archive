@@ -8,13 +8,13 @@ import { useJobs } from '../hooks/useJobs'
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   `rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
     isActive
-      ? 'bg-white text-sky-700 shadow-sm'
-      : 'text-slate-600 hover:text-sky-700'
+      ? 'bg-white text-brand-ink shadow-sm'
+      : 'text-brand-muted hover:text-brand-ink'
   }`
 
 const mobileNavLinkClass = ({ isActive }: { isActive: boolean }) =>
   `flex items-center rounded-lg px-3 py-2.5 text-sm font-semibold transition ${
-    isActive ? 'bg-sky-50 text-sky-700' : 'text-slate-700 hover:bg-slate-50 hover:text-sky-700'
+    isActive ? 'bg-brand-mist text-brand-ink' : 'text-brand-muted hover:bg-brand-mist hover:text-brand-ink'
   }`
 
 export function Header() {
@@ -38,17 +38,17 @@ export function Header() {
   }, [menuOpen])
 
   return (
-    <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/95 backdrop-blur-md">
+    <header className="sticky top-0 z-50 border-b border-brand-line bg-white/95 font-sans backdrop-blur-md">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
         <Link to="/" className="flex items-center gap-2.5">
-          <AppLogo />
+          <AppLogo tone="brand" />
           <span className="font-display text-lg font-bold tracking-tight">
-            <span className="text-slate-800">Apply</span>
-            <span className="text-sky-600">Track</span>
+            <span className="text-brand-ink">Apply</span>
+            <span className="text-brand-primary">Track</span>
           </span>
         </Link>
 
-        <nav className="hidden items-center gap-2 rounded-xl bg-slate-100/90 p-1 sm:flex">
+        <nav className="hidden items-center gap-2 rounded-xl bg-brand-mist p-1 sm:flex">
           <NavLink to="/" className={navLinkClass} end>
             Board
           </NavLink>
@@ -81,7 +81,7 @@ export function Header() {
 
         <button
           type="button"
-          className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 sm:hidden"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-brand-muted transition hover:bg-brand-mist hover:text-brand-ink sm:hidden"
           aria-expanded={menuOpen}
           aria-controls="mobile-nav"
           aria-label={menuOpen ? 'Close menu' : 'Open menu'}
@@ -100,7 +100,7 @@ export function Header() {
       </div>
 
       {menuOpen && (
-        <div id="mobile-nav" className="border-t border-slate-200/80 px-4 pb-3 sm:hidden">
+        <div id="mobile-nav" className="border-t border-brand-line px-4 pb-3 sm:hidden">
           <nav className="flex flex-col gap-0.5 py-2">
             <NavLink to="/add" className={mobileNavLinkClass}>
               Add
@@ -110,7 +110,7 @@ export function Header() {
             </NavLink>
           </nav>
           {(isCloudSync || isCloudEnabled) && (
-            <div className="flex items-center justify-between gap-2 border-t border-slate-100 pt-2">
+            <div className="flex items-center justify-between gap-2 border-t border-brand-line pt-2">
               {isCloudSync ? (
                 <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">
                   Synced
@@ -130,7 +130,7 @@ export function Header() {
 function InboxBadge({ count }: { count: number }) {
   if (count <= 0) return null
   return (
-    <span className="ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-sky-600 px-1 text-[10px] font-bold text-white">
+    <span className="ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-primary px-1 text-[10px] font-bold text-brand-ink">
       {count}
     </span>
   )
@@ -151,7 +151,7 @@ function AuthControls({
       <button
         type="button"
         onClick={onSignOut}
-        className="rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-500 transition hover:bg-red-50 hover:text-red-600"
+        className="rounded-lg px-3 py-1.5 text-sm font-semibold text-brand-muted transition hover:bg-red-50 hover:text-red-600"
       >
         Sign out
       </button>
@@ -160,7 +160,7 @@ function AuthControls({
   return (
     <NavLink
       to="/login"
-      className="rounded-lg bg-sky-600 px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700"
+      className="rounded-lg bg-brand-primary px-3.5 py-1.5 text-sm font-semibold text-brand-ink shadow-sm transition hover:bg-brand-primaryDeep"
     >
       Sign in
     </NavLink>

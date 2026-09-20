@@ -3,7 +3,7 @@ import { useInbox } from '../hooks/useInbox'
 
 const tabClass = ({ isActive }: { isActive: boolean }) =>
   `flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold ${
-    isActive ? 'text-sky-600' : 'text-slate-500'
+    isActive ? 'text-brand-primary' : 'text-brand-muted'
   }`
 
 export function MobileTabBar() {
@@ -14,7 +14,7 @@ export function MobileTabBar() {
       aria-label="Primary"
       className="fixed inset-x-4 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-50 sm:hidden"
     >
-      <div className="grid h-16 grid-cols-3 rounded-2xl border border-slate-200/90 bg-white/95 shadow-lg shadow-slate-300/50 backdrop-blur-md">
+      <div className="grid h-16 grid-cols-3 rounded-2xl border border-brand-line bg-white/95 shadow-lg shadow-brand-ink/10 backdrop-blur-md">
         <NavLink to="/" end className={tabClass}>
           <BoardIcon />
           Board
@@ -27,7 +27,7 @@ export function MobileTabBar() {
           <span className="relative">
             <InboxIcon />
             {newCount > 0 && (
-              <span className="absolute -right-2.5 -top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-sky-600 px-1 text-[9px] font-bold text-white">
+              <span className="absolute -right-2.5 -top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-primary px-1 text-[9px] font-bold text-brand-ink">
                 {newCount > 99 ? '99+' : newCount}
               </span>
             )}

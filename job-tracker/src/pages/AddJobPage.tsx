@@ -1,18 +1,11 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { parseJobPosting } from '../api/gemini'
-import { PageToolbar } from '../components/PageToolbar'
+import { boardLook } from '../components/BoardLook'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { useJobs } from '../hooks/useJobs'
 import { useMasterCv } from '../hooks/useMasterCv'
-import {
-  formAccentBtnClass,
-  formControlClass,
-  formGridClass,
-  formLabelClass,
-  formSelectClass,
-} from '../lib/formUi'
-import { scoreMasterCvAgainstJob } from '../lib/matchScore'
+import { scoreMasterCvAgainstJob, withRequirementSignals } from '../lib/matchScore'
 import { CV_TRACK_LABELS, CV_TRACKS, type CvTrack } from '../types/cv'
 import {
   createEmptyJob,
@@ -21,6 +14,12 @@ import {
   PORTAL_JOB_SOURCE_OPTIONS,
   type PortalJobSource,
 } from '../types/job'
+
+const mintBtn =
+  'm-action rounded-lg border border-[#e6eeeb] bg-white px-4 py-2 text-sm font-semibold text-brand-ink transition hover:border-brand-primary hover:bg-brand-mist disabled:opacity-60'
+const fieldLabel = 'text-sm text-brand-muted'
+const fieldControl =
+  'mt-1 w-full rounded-lg border border-[#e6eeeb] bg-white px-3 py-2 text-sm text-brand-ink outline-none transition focus:border-brand-primary'
 
 export function AddJobPage() {
   const navigate = useNavigate()
@@ -62,7 +61,10 @@ export function AddJobPage() {
         // Keep the original pasted posting verbatim — never replace with summary
         jobDescription: pasteText.trim(),
         jdSummary: parsed.summary || prev.jdSummary,
-        extractedSkills: parsed.skills ?? [],
+        extractedSkills: withRequirementSignals(
+          `${parsed.role || prev.role}\n${pasteText}`,
+          parsed.skills ?? []
+        ),
         extractedRequirements: parsed.requirements ?? [],
       }))
     } catch (err) {
@@ -81,15 +83,14 @@ export function AddJobPage() {
     try {
       const fullJd = form.jobDescription.trim() || pasteText.trim()
       const track = form.cvTrack ?? activeTrack
-      const match = scoreMasterCvAgainstJob(
-        `${form.role}\n${fullJd}`,
-        getCv(track),
-        form.extractedSkills
-      )
+      const described = `${form.role}\n${fullJd}`
+      const extractedSkills = withRequirementSignals(described, form.extractedSkills)
+      const match = scoreMasterCvAgainstJob(described, getCv(track), extractedSkills)
       await addJob({
         ...form,
         status: 'saved',
         jobDescription: fullJd,
+        extractedSkills,
         cvTrack: track,
         matchScore: match.score,
         jdComplete: Boolean(fullJd),
@@ -107,11 +108,16 @@ export function AddJobPage() {
     : 'indeed'
 
   return (
-    <div className="mx-auto max-w-2xl space-y-8">
-      <PageToolbar title="Add application" />
+    <div className="mx-auto max-w-2xl space-y-4">
+      <div className="space-y-3">
+        <Link to="/" className="text-sm font-medium text-brand-muted hover:text-brand-ink">
+          ← Back to board
+        </Link>
+        <h1 className={boardLook.headline}>Add application</h1>
+      </div>
 
-      <div className="rounded-2xl border border-sky-100 bg-sky-50/60 p-5 shadow-sm">
-        <h2 className="mb-3 font-semibold">Quick add with AI</h2>
+      <section className={`${boardLook.card} space-y-3 p-4 sm:p-5`}>
+        <h2 className="font-display text-base font-semibold text-brand-ink">Quick add with AI</h2>
         <textarea
           value={pasteText}
           onChange={(e) => {
@@ -120,86 +126,87 @@ export function AddJobPage() {
             setForm((prev) => ({ ...prev, jobDescription: value }))
           }}
           rows={8}
-          className="w-full rounded-lg border border-slate-300 bg-white p-3 text-sm outline-none focus:border-track-accent dark:border-track-700 dark:bg-track-900"
+          placeholder="Paste the complete job posting here…"
+          className={fieldControl}
         />
-        <button
-          type="button"
-          onClick={handleParseAndFill}
-          disabled={parsing || !pasteText.trim()}
-          className="mt-2 rounded-lg bg-track-accent px-4 py-2 text-sm font-medium text-white hover:bg-sky-600 disabled:opacity-50"
-        >
-          {parsing ? 'Parsing…' : 'Parse with AI'}
-        </button>
+        <div className="m-actions">
+          <button
+            type="button"
+            data-role="primary"
+            onClick={handleParseAndFill}
+            disabled={parsing || !pasteText.trim()}
+            className={mintBtn}
+          >
+            {parsing ? 'Parsing…' : 'Parse with AI'}
+          </button>
+        </div>
         {parsing && <LoadingSpinner label="Extracting job details…" />}
-      </div>
+      </section>
 
-      <form
-        onSubmit={handleSubmit}
-        className="space-y-2.5 rounded-xl border border-slate-200 bg-white p-4 dark:border-track-700 dark:bg-track-800"
-      >
+      <form onSubmit={handleSubmit} className={`${boardLook.card} space-y-4 p-4 sm:p-5`}>
         {error && (
-          <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-300">
+          <p className="text-sm text-red-700" role="alert">
             {error}
           </p>
         )}
 
-        <div className={formGridClass}>
+        <div className="grid gap-3 sm:grid-cols-2">
           <label className="block">
-            <span className={formLabelClass}>
-              Company <span className="text-red-500">*</span>
+            <span className={fieldLabel}>
+              Company <span className="text-red-700">*</span>
             </span>
             <input
               value={form.company}
               onChange={(e) => update('company', e.target.value)}
-              className={formControlClass}
+              className={fieldControl}
               required
             />
           </label>
           <label className="block">
-            <span className={formLabelClass}>
-              Role <span className="text-red-500">*</span>
+            <span className={fieldLabel}>
+              Role <span className="text-red-700">*</span>
             </span>
             <input
               value={form.role}
               onChange={(e) => update('role', e.target.value)}
-              className={formControlClass}
+              className={fieldControl}
               required
             />
           </label>
           <label className="block">
-            <span className={formLabelClass}>Location</span>
+            <span className={fieldLabel}>Location</span>
             <input
               value={form.location}
               onChange={(e) => update('location', e.target.value)}
-              className={formControlClass}
+              className={fieldControl}
             />
           </label>
           <label className="block">
-            <span className={formLabelClass}>Salary</span>
+            <span className={fieldLabel}>Salary</span>
             <input
               value={form.salary}
               onChange={(e) => update('salary', e.target.value)}
-              className={formControlClass}
+              className={fieldControl}
             />
           </label>
           <label className="block sm:col-span-2">
-            <span className={formLabelClass}>Job URL</span>
+            <span className={fieldLabel}>Job URL</span>
             <input
               type="url"
               value={form.jobUrl}
               onChange={(e) => setJobUrl(e.target.value)}
-              className={formControlClass}
+              className={fieldControl}
             />
           </label>
           <label className="block">
-            <span className={formLabelClass}>Portal</span>
+            <span className={fieldLabel}>Portal</span>
             <select
               value={sourceValue}
               onChange={(e) => {
                 setSourceLocked(true)
                 update('source', e.target.value)
               }}
-              className={formSelectClass}
+              className={`${fieldControl} form-select`}
             >
               {PORTAL_JOB_SOURCE_OPTIONS.map((value) => (
                 <option key={value} value={value}>
@@ -209,13 +216,13 @@ export function AddJobPage() {
             </select>
           </label>
           <label className="block">
-            <span className={formLabelClass}>
-              Master CV <span className="text-red-500">*</span>
+            <span className={fieldLabel}>
+              Master CV <span className="text-red-700">*</span>
             </span>
             <select
               value={form.cvTrack ?? activeTrack}
               onChange={(e) => update('cvTrack', e.target.value as CvTrack)}
-              className={formSelectClass}
+              className={`${fieldControl} form-select`}
             >
               {CV_TRACKS.map((track) => (
                 <option key={track} value={track}>
@@ -227,14 +234,14 @@ export function AddJobPage() {
         </div>
 
         {form.jdSummary && (
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 dark:border-track-700 dark:bg-track-900">
-            <span className={formLabelClass}>AI summary</span>
-            <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-300">{form.jdSummary}</p>
+          <div className="rounded-lg border border-[#e6eeeb] bg-[#f7fbf9] p-3">
+            <span className={fieldLabel}>AI summary</span>
+            <p className="mt-1 text-sm leading-relaxed text-brand-ink">{form.jdSummary}</p>
           </div>
         )}
 
         <label className="block">
-          <span className={formLabelClass}>Full job description</span>
+          <span className={fieldLabel}>Full job description</span>
           <textarea
             value={form.jobDescription}
             onChange={(e) => {
@@ -242,29 +249,26 @@ export function AddJobPage() {
               setPasteText(e.target.value)
             }}
             rows={8}
-            className={formControlClass}
+            className={fieldControl}
           />
         </label>
 
         <label className="block">
-          <span className={formLabelClass}>Personal notes</span>
+          <span className={fieldLabel}>Personal notes</span>
           <textarea
             value={form.notes}
             onChange={(e) => update('notes', e.target.value)}
             rows={2}
-            className={formControlClass}
+            className={fieldControl}
           />
         </label>
 
         {form.extractedSkills.length > 0 && (
           <div>
-            <span className={formLabelClass}>Extracted skills</span>
-            <div className="mt-1 flex flex-wrap gap-1">
+            <span className={fieldLabel}>Extracted skills</span>
+            <div className="mt-2 flex flex-wrap gap-2">
               {form.extractedSkills.map((skill) => (
-                <span
-                  key={skill}
-                  className="rounded-full bg-sky-50 px-2 py-0.5 text-xs text-sky-600 dark:bg-sky-950/50 dark:text-sky-400"
-                >
+                <span key={skill} className="rounded-lg bg-[#f4faf8] px-2.5 py-1 text-sm text-brand-ink">
                   {skill}
                 </span>
               ))}
@@ -272,9 +276,11 @@ export function AddJobPage() {
           </div>
         )}
 
-        <button type="submit" className={`w-full ${formAccentBtnClass} py-2 font-semibold`}>
-          Save application
-        </button>
+        <div className="m-actions">
+          <button type="submit" data-role="primary" className={mintBtn}>
+            Save application
+          </button>
+        </div>
       </form>
     </div>
   )

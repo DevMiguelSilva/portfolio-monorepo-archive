@@ -1,23 +1,28 @@
 import { useMemo, useState, type DragEvent } from 'react'
-import { PageToolbar } from '../components/PageToolbar'
+import { Link } from 'react-router-dom'
+import { boardLook } from '../components/BoardLook'
 import { attachCardDragGhost } from '../components/JobCard'
+import { IconAction } from '../components/IconAction'
 import { LoadingSpinner } from '../components/LoadingSpinner'
-import { SourceBadge } from '../components/SourceBadge'
 import { useInbox } from '../hooks/useInbox'
 import { useSavedSearches } from '../hooks/useSavedSearches'
-import { parseDualTrackReason } from '../lib/matchScore'
 import { expandSearchLocations } from '../lib/searchLocations'
 import { CV_TRACK_LABELS, CV_TRACKS, type CvTrack } from '../types/cv'
-import {
-  formControlClass,
-  formGridClass,
-  formLabelClass,
-  formPanelClass,
-  formPrimaryBtnClass,
-  formSelectClass,
-} from '../lib/formUi'
-import { btnGhostClass, btnPrimaryClass } from '../lib/appUi'
 import { createEmptySavedSearch, type SavedSearch } from '../types/job'
+
+const toolbarBtn =
+  'm-action rounded-lg border border-[#e6eeeb] bg-white px-4 py-2 text-sm font-semibold text-brand-ink transition hover:bg-[#f4faf8] disabled:opacity-60'
+const refreshBtn =
+  'm-action rounded-lg border border-[#e6eeeb] bg-white px-4 py-2 text-sm font-semibold text-brand-ink transition hover:border-brand-primary hover:bg-brand-mist disabled:opacity-60'
+const rowBtn =
+  'rounded-lg border border-[#e6eeeb] bg-white px-3 py-2 text-center text-sm font-semibold text-brand-ink transition hover:bg-[#f4faf8] disabled:opacity-60'
+const rowRun =
+  'rounded-lg border border-[#e6eeeb] bg-white px-3 py-2 text-center text-sm font-semibold text-brand-ink transition hover:border-brand-primary hover:bg-brand-mist disabled:opacity-60'
+const rowDanger =
+  'rounded-lg border border-[#e6eeeb] bg-white px-3 py-2 text-center text-sm font-semibold text-red-700 transition hover:border-red-200 hover:bg-red-50'
+const fieldLabel = 'text-sm text-brand-muted'
+const fieldControl =
+  'mt-1 w-full rounded-lg border border-[#e6eeeb] bg-white px-3 py-2 text-sm text-brand-ink outline-none transition focus:border-brand-primary'
 
 const emptyDraft = {
   label: '',
@@ -26,6 +31,12 @@ const emptyDraft = {
   maxDaysOld: 7,
   excludeTerms: '',
   track: 'powerPlatform' as CvTrack,
+}
+
+try {
+  sessionStorage.removeItem('inbox-search-look')
+} catch {
+  /* ignore */
 }
 
 export function InboxPage() {
@@ -222,54 +233,57 @@ export function InboxPage() {
     setEditingId(null)
   }
 
+  const dismissBtn =
+    'm-action rounded-lg border border-[#e6eeeb] bg-white px-4 py-2 text-sm font-semibold text-brand-ink transition hover:border-red-200 hover:text-red-700 disabled:opacity-60'
+  const approveBtn =
+    'm-action rounded-lg border border-[#e6eeeb] bg-white px-4 py-2 text-sm font-semibold text-brand-ink transition hover:border-brand-primary hover:bg-brand-mist disabled:opacity-60'
+
   return (
-    <div className="space-y-6">
-      <PageToolbar
-        title="Inbox"
-        actions={
-          <>
-            <button
-              type="button"
-              onClick={() => setShowSearches((v) => !v)}
-              className={btnGhostClass}
-            >
+    <div className="space-y-4">
+      <div className="space-y-3">
+        <Link to="/" className="text-sm font-medium text-brand-muted hover:text-brand-ink">
+          ← Back to board
+        </Link>
+        <div className="m-action-row flex flex-wrap items-center justify-between gap-4">
+          <h1 className={boardLook.headline}>Inbox</h1>
+          <div className="m-actions flex flex-wrap gap-2">
+            <button type="button" onClick={() => setShowSearches((v) => !v)} className={toolbarBtn}>
               {showSearches ? 'Hide searches' : `Saved searches (${searches.length})`}
             </button>
             <button
               type="button"
               onClick={handleClearReview}
               disabled={refreshing || newCount === 0}
-              className={btnGhostClass}
+              className={toolbarBtn}
             >
               Clear review list
             </button>
             <button
               type="button"
+              data-role="primary"
               onClick={handleRefresh}
               disabled={refreshing || Boolean(runningAloneId)}
-              className={btnPrimaryClass}
+              className={refreshBtn}
             >
-            {refreshing && !runningAloneId ? 'Refreshing…' : 'Refresh active'}
+              {refreshing && !runningAloneId ? 'Refreshing…' : 'Refresh active'}
             </button>
-          </>
-        }
-      />
+          </div>
+        </div>
+      </div>
 
-      <div className="rounded-2xl border border-slate-200/80 bg-white px-4 py-3 text-sm shadow-sm">
-        <span className="font-semibold text-sky-600">{newCount}</span> roles ready to review
-        {newCount > 0 && (
-          <span className="text-slate-500">
-            {' '}
-            · <span className="font-medium text-emerald-600">{firstSeenCount}</span> new
-            {seenBeforeCount > 0 && (
-              <>
-                {' '}
-                · <span className="font-medium text-amber-700">{seenBeforeCount}</span> seen before
-              </>
-            )}
-          </span>
-        )}
-        <span className="mt-1 block text-xs text-slate-500">
+      <div className={`${boardLook.card} px-5 py-4`}>
+        <p className="text-sm text-brand-ink">
+          <span className="font-semibold tabular-nums">{newCount}</span>
+          <span className="text-brand-muted"> ready to review</span>
+          {newCount > 0 && (
+            <span className="text-brand-muted">
+              {' '}
+              · {firstSeenCount} new
+              {seenBeforeCount > 0 && <> · {seenBeforeCount} seen before</>}
+            </span>
+          )}
+        </p>
+        <p className="mt-1 text-xs text-brand-muted">
           {activeSearches.length === 0
             ? searches.length === 0
               ? 'No saved searches yet.'
@@ -277,161 +291,76 @@ export function InboxPage() {
             : activeSearches.length === 1
               ? `Active search: ${activeSearches[0].label.trim() || activeSearches[0].query}`
               : `${activeSearches.length} searches active.`}
-        </span>
+        </p>
       </div>
 
       {(error || refreshError) && (
-        <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-300">
+        <p className="text-sm text-red-700" role="alert">
           {error || refreshError}
         </p>
       )}
 
       {showSearches && (
-        <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 dark:border-track-700 dark:bg-track-800">
-          <h2 className="font-semibold">Saved searches</h2>
+        <section className={`${boardLook.card} space-y-4 p-4 sm:p-5`}>
+          <h2 className="font-display text-base font-semibold text-brand-ink">Saved searches</h2>
           <ul className="space-y-3">
             {searches.map((search, index) => (
               <li
                 key={search.id}
                 onDragOver={(e) => handleSearchDragOver(index, e)}
                 onDrop={() => handleSearchDrop(index)}
-                className={`rounded-lg border p-3 text-sm dark:border-track-700 ${
-                  search.active
-                    ? 'border-track-accent/40 bg-track-accent/5 dark:bg-track-accent/10'
-                    : 'border-slate-200'
-                } ${dragIndex === index ? 'opacity-40' : ''} ${
+                className={`rounded-[1.25rem] border border-[#e6eeeb] bg-white p-4 text-sm ${
+                  dragIndex === index ? 'opacity-40' : ''
+                } ${
                   dropIndex === index && dragIndex != null && dragIndex !== index
-                    ? 'ring-2 ring-track-accent/50'
+                    ? 'ring-2 ring-brand-primary/40'
                     : ''
                 }`}
               >
-                {editingId === search.id ? (
-                  <div className="space-y-2.5">
-                    <SearchFields draft={editDraft} setDraft={setEditDraft} />
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => saveEdit(search.id)}
-                        className="rounded-lg bg-track-accent px-3 py-1.5 text-xs font-medium text-white"
-                      >
-                        Save changes
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditingId(null)}
-                        className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs dark:border-track-700"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex min-w-0 flex-1 items-center gap-2">
-                      <button
-                        type="button"
-                        draggable
-                        onDragStart={(e) => handleSearchDragStart(index, e)}
-                        onDragEnd={handleSearchDragEnd}
-                        className="flex h-8 w-6 shrink-0 cursor-grab select-none items-center justify-center leading-none text-slate-400 active:cursor-grabbing"
-                        title="Drag to reorder"
-                        aria-label={`Reorder ${search.label.trim() || search.query}`}
-                      >
-                        ⋮⋮
-                      </button>
-                      <div className="min-w-0">
-                        <p className="font-medium">
-                          {search.label.trim() || search.query}
-                          {search.active ? (
-                            <span className="ml-2 text-xs font-semibold text-track-accent">
-                              active
-                            </span>
-                          ) : (
-                            <span className="ml-2 text-xs text-slate-400">paused</span>
-                          )}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          {search.label.trim() && search.label.trim() !== search.query
-                            ? `${search.query} · `
-                            : ''}
-                          {expandSearchLocations(search.location)
-                            .map((leg) => leg.label)
-                            .join(' · ')}{' '}
-                          · last {search.maxDaysOld}d · {search.country.toUpperCase()} · CV:{' '}
-                          {search.track === 'auto'
-                            ? 'Auto (best match)'
-                            : CV_TRACK_LABELS[search.track]}
-                          {search.excludeTerms?.trim()
-                            ? ` · exclude: ${search.excludeTerms.trim()}`
-                            : ''}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        disabled={refreshing || Boolean(runningAloneId)}
-                        onClick={() => handleRunAlone(search.id)}
-                        className="rounded-md bg-track-accent px-2 py-1 text-xs font-semibold text-white hover:bg-sky-600 disabled:opacity-50"
-                      >
-                        {runningAloneId === search.id ? 'Running…' : 'Run alone'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => startEdit(search)}
-                        className="text-xs text-track-accent hover:underline"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => updateSearch(search.id, { active: !search.active })}
-                        className="text-xs text-track-accent hover:underline"
-                      >
-                        {search.active ? 'Pause' : 'Activate'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => deleteSearch(search.id)}
-                        className="text-xs text-red-500 hover:underline"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                )}
+                <SavedSearchBody
+                  search={search}
+                  index={index}
+                  editing={editingId === search.id}
+                  running={runningAloneId === search.id}
+                  busy={refreshing || Boolean(runningAloneId)}
+                  editDraft={editDraft}
+                  setEditDraft={setEditDraft}
+                  onDragStart={handleSearchDragStart}
+                  onDragEnd={handleSearchDragEnd}
+                  onRun={() => void handleRunAlone(search.id)}
+                  onEdit={() => startEdit(search)}
+                  onToggleActive={() => void updateSearch(search.id, { active: !search.active })}
+                  onDelete={() => void deleteSearch(search.id)}
+                  onSave={() => void saveEdit(search.id)}
+                  onCancel={() => setEditingId(null)}
+                />
               </li>
             ))}
           </ul>
 
-          <div className="border-t border-slate-200 pt-4 dark:border-track-700">
+          <div className="border-t border-[#e6eeeb] pt-4">
             {!showAddSearch ? (
-              <button
-                type="button"
-                onClick={() => setShowAddSearch(true)}
-                className="text-sm font-medium text-track-accent hover:underline"
-              >
-                + Add search
+              <button type="button" onClick={() => setShowAddSearch(true)} className={toolbarBtn}>
+                Add search
               </button>
             ) : (
-              <form onSubmit={handleAddSearch} className={formPanelClass}>
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm font-semibold">New saved search</p>
+              <form onSubmit={handleAddSearch} className="space-y-3">
+                <p className="font-display text-base font-semibold text-brand-ink">New saved search</p>
+                <SearchFields draft={draft} setDraft={setDraft} />
+                <div className="m-actions flex flex-wrap gap-2">
+                  <button type="submit" data-role="primary" className={refreshBtn}>
+                    Save search
+                  </button>
                   <button
                     type="button"
+                    data-role="quiet"
                     onClick={() => {
                       setShowAddSearch(false)
                       setDraft(emptyDraft)
                     }}
-                    className="text-xs text-slate-500 hover:underline"
+                    className={toolbarBtn}
                   >
                     Cancel
-                  </button>
-                </div>
-                <SearchFields draft={draft} setDraft={setDraft} />
-                <div className="flex justify-end">
-                  <button type="submit" className={formPrimaryBtnClass}>
-                    Save search
                   </button>
                 </div>
               </form>
@@ -443,119 +372,245 @@ export function InboxPage() {
       {loading ? (
         <LoadingSpinner label="Loading inbox…" />
       ) : newJobs.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-300 p-12 text-center dark:border-track-700">
-          <h3 className="font-semibold">Inbox is empty</h3>
+        <div className={boardLook.empty}>
+          <h3 className={boardLook.emptyTitle}>Inbox is empty</h3>
+          <p className={`mt-2 ${boardLook.body}`}>Refresh a saved search to review new roles.</p>
         </div>
       ) : (
         <ul className="space-y-3">
-          {newJobs.map((job) => (
-            <li
-              key={job.id}
-              className="rounded-xl border border-slate-200 bg-white p-5 dark:border-track-700 dark:bg-track-800"
-            >
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span
-                      className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${
-                        job.matchScore >= 70
-                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
-                          : job.matchScore >= 45
-                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300'
-                            : 'bg-slate-100 text-slate-600 dark:bg-track-900 dark:text-slate-300'
-                      }`}
-                    >
-                      {job.matchScore}%
-                      {job.matchedTrack ? ` · ${CV_TRACK_LABELS[job.matchedTrack]}` : ' match'}
-                    </span>
-                    <SourceBadge source={job.source} />
-                    {(job.seenCount ?? 1) > 1 ? (
-                      <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 ring-1 ring-inset ring-amber-300/80 dark:bg-amber-950/50 dark:text-amber-300 dark:ring-amber-700">
-                        Seen before
-                      </span>
-                    ) : (
-                      <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-inset ring-emerald-300/80 dark:bg-emerald-950/50 dark:text-emerald-300 dark:ring-emerald-700">
-                        New
-                      </span>
-                    )}
-                  </div>
-                  {(() => {
-                    const dual = parseDualTrackReason(job.matchReasons)
-                    return dual ? (
-                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                        {CV_TRACKS.map(
-                          (t) => `${CV_TRACK_LABELS[t]} ${dual[t]}%`
-                        ).join(' · ')}
-                      </p>
-                    ) : null
-                  })()}
-                  <h3 className="mt-1 text-lg font-semibold">{job.role}</h3>
-                  <p className="text-slate-500 dark:text-slate-400">{job.company}</p>
-                  <div className="mt-1 flex flex-wrap gap-3 text-sm text-slate-500">
-                    {job.location && <span>{job.location}</span>}
-                    {job.salary && <span>{job.salary}</span>}
-                    {job.savedSearchId && searchLabelById.get(job.savedSearchId) && (
-                      <span className="font-medium text-slate-600 dark:text-slate-300">
-                        via search: {searchLabelById.get(job.savedSearchId)}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2">
+          {newJobs.map((job) => {
+            const skills = job.matchReasons
+              .filter((reason) => reason.startsWith('CV covers '))
+              .map((reason) => reason.slice('CV covers '.length).trim())
+              .filter(Boolean)
+            const searchName = job.savedSearchId ? searchLabelById.get(job.savedSearchId) : undefined
+            const seenBefore = (job.seenCount ?? 1) > 1
+            return (
+              <li key={job.id} className={`${boardLook.card} inbox-job p-4 sm:p-5`}>
+                <div className="inbox-job-facts min-w-0">
+                  <p className={`text-sm ${seenBefore ? 'text-[#8a6230]' : 'text-brand-muted'}`}>
+                    {seenBefore ? 'Seen before' : 'New'}
+                  </p>
+                  <h3 className="mt-2 font-sans text-base font-semibold leading-snug text-brand-ink">
+                    {job.role || 'Untitled role'}
+                  </h3>
+                  <p className="mt-1 truncate text-sm text-brand-muted">{job.company || 'Unknown company'}</p>
+                  {job.location.trim() && (
+                    <p className="truncate text-sm text-brand-muted">{job.location}</p>
+                  )}
+                  {job.salary.trim() && <p className="mt-2 text-sm text-brand-ink">{job.salary}</p>}
+                  {searchName && (
+                    <p className="mt-2 text-sm text-brand-muted">Found by {searchName}</p>
+                  )}
                   {job.jobUrl && (
                     <a
                       href={job.jobUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm dark:border-track-700"
+                      className="mt-2 inline-block text-sm text-brand-ink underline-offset-4 transition hover:text-brand-primaryDeep hover:underline"
                     >
-                      Open
+                      Open original posting
                     </a>
                   )}
+                </div>
+                {skills.length > 0 && (
+                  <div className="inbox-job-skills flex flex-wrap gap-2">
+                    {skills.map((skill) => (
+                      <span
+                        key={skill}
+                        className="rounded-lg bg-[#f4faf8] px-2.5 py-1 text-sm text-brand-ink"
+                      >
+                        {skill}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="inbox-job-actions m-actions flex flex-wrap gap-2">
                   <button
                     type="button"
+                    data-role="quiet"
                     disabled={actionId === job.id}
                     onClick={() => handleDismiss(job.id)}
-                    className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm dark:border-track-700"
+                    className={dismissBtn}
                   >
                     Dismiss
                   </button>
                   <button
                     type="button"
+                    data-role="primary"
                     disabled={actionId === job.id}
                     onClick={() => handleApprove(job.id)}
-                    className="rounded-lg bg-track-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-600 disabled:opacity-50"
+                    className={approveBtn}
                   >
                     Approve
                   </button>
                 </div>
-              </div>
-              {job.matchReasons.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {job.matchReasons
-                    .filter((r) => !r.startsWith('Scores:') && !r.startsWith('Best for apply:'))
-                    .slice(0, 8)
-                    .map((reason) => (
-                      <span
-                        key={reason}
-                        className="rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-600 dark:bg-track-900 dark:text-slate-300"
-                      >
-                        {reason}
-                      </span>
-                    ))}
-                </div>
-              )}
-              {job.description && (
-                <p className="mt-3 line-clamp-3 text-sm text-slate-600 dark:text-slate-300">
-                  {job.description}
-                </p>
-              )}
-            </li>
-          ))}
+              </li>
+            )
+          })}
         </ul>
       )}
     </div>
   )
+}
+
+function SavedSearchBody({
+  search,
+  index,
+  editing,
+  running,
+  busy,
+  editDraft,
+  setEditDraft,
+  onDragStart,
+  onDragEnd,
+  onRun,
+  onEdit,
+  onToggleActive,
+  onDelete,
+  onSave,
+  onCancel,
+}: {
+  search: SavedSearch
+  index: number
+  editing: boolean
+  running: boolean
+  busy: boolean
+  editDraft: typeof emptyDraft
+  setEditDraft: React.Dispatch<React.SetStateAction<typeof emptyDraft>>
+  onDragStart: (index: number, event: DragEvent<HTMLElement>) => void
+  onDragEnd: () => void
+  onRun: () => void
+  onEdit: () => void
+  onToggleActive: () => void
+  onDelete: () => void
+  onSave: () => void
+  onCancel: () => void
+}) {
+  const name = search.label.trim() || search.query
+  const meta = searchMeta(search)
+
+  if (editing) {
+    return (
+      <div className="space-y-2.5">
+        <SearchFields draft={editDraft} setDraft={setEditDraft} />
+        <div className="m-actions flex flex-wrap gap-2">
+          <button type="button" data-role="primary" onClick={onSave} className={refreshBtn}>
+            Save changes
+          </button>
+          <button type="button" data-role="quiet" onClick={onCancel} className={toolbarBtn}>
+            Cancel
+          </button>
+        </div>
+        <div className="search-mobile-only border-t border-[#e6eeeb] pt-3">
+          <button type="button" onClick={onToggleActive} className={rowBtn}>
+            {search.active ? 'Pause' : 'Activate'}
+          </button>
+          <button type="button" onClick={onDelete} className={rowDanger}>
+            Delete
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="search-row">
+      <div className="flex min-w-0 items-center gap-2">
+        <button
+          type="button"
+          draggable
+          onDragStart={(event) => onDragStart(index, event)}
+          onDragEnd={onDragEnd}
+          className="search-drag h-8 w-6 shrink-0 cursor-grab select-none items-center justify-center leading-none text-brand-muted active:cursor-grabbing"
+          title="Drag to reorder"
+          aria-label={`Reorder ${name}`}
+        >
+          ⋮⋮
+        </button>
+        <div className="min-w-0 text-left">
+          <p className="font-medium text-brand-ink">
+            {name}
+            {search.active ? (
+              <span className="ml-2 text-xs font-medium text-brand-primaryDeep">active</span>
+            ) : (
+              <span className="ml-2 text-xs text-brand-muted">paused</span>
+            )}
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-brand-muted">{meta}</p>
+        </div>
+      </div>
+      <div className="search-icons">
+        <IconAction label={running ? 'Running' : 'Run'} disabled={busy} onClick={onRun}>
+          <PlayIcon />
+        </IconAction>
+        <IconAction label="Edit" onClick={onEdit}>
+          <PencilIcon />
+        </IconAction>
+        <IconAction label={search.active ? 'Pause' : 'Activate'} onClick={onToggleActive}>
+          {search.active ? <PauseIcon /> : <PlayIcon />}
+        </IconAction>
+        <IconAction label="Delete" danger onClick={onDelete}>
+          <TrashIcon />
+        </IconAction>
+      </div>
+      <div className="search-pair">
+        <button type="button" disabled={busy} onClick={onRun} className={rowRun}>
+          {running ? 'Running…' : 'Run alone'}
+        </button>
+        <button type="button" onClick={onEdit} className={rowBtn}>
+          Edit
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function PlayIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M5 3.5v9l8-4.5-8-4.5Z" fill="currentColor" />
+    </svg>
+  )
+}
+
+function PauseIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M4.5 3h2.2v10H4.5V3Zm4.8 0h2.2v10H9.3V3Z" fill="currentColor" />
+    </svg>
+  )
+}
+
+function PencilIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M9.2 3.3 12.7 6.8 5.5 14H2v-3.5l7.2-7.2Z" stroke="currentColor" strokeWidth="1.4" />
+    </svg>
+  )
+}
+
+function TrashIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M3.5 4.5h9M6 4.5V3h4v1.5M5 4.5l.5 8h5l.5-8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function searchMeta(search: SavedSearch) {
+  return [
+    search.label.trim() && search.label.trim() !== search.query ? search.query : '',
+    expandSearchLocations(search.location)
+      .map((leg) => leg.label)
+      .join(' · '),
+    `last ${search.maxDaysOld}d`,
+    search.country.toUpperCase(),
+    `CV: ${search.track === 'auto' ? 'Auto (best match)' : CV_TRACK_LABELS[search.track]}`,
+    search.excludeTerms?.trim() ? `exclude: ${search.excludeTerms.trim()}` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ')
 }
 
 function SearchFields({
@@ -566,59 +621,59 @@ function SearchFields({
   setDraft: React.Dispatch<React.SetStateAction<typeof emptyDraft>>
 }) {
   return (
-    <div className={formGridClass}>
+    <div className="search-fields">
       <label className="block">
-        <span className={formLabelClass}>Label</span>
+        <span className={fieldLabel}>Label</span>
         <input
           value={draft.label}
           onChange={(e) => setDraft((d) => ({ ...d, label: e.target.value }))}
-          className={formControlClass}
+          className={fieldControl}
         />
       </label>
       <label className="block">
-        <span className={formLabelClass}>Locations</span>
+        <span className={fieldLabel}>Locations</span>
         <input
           value={draft.location}
           onChange={(e) => setDraft((d) => ({ ...d, location: e.target.value }))}
-          className={formControlClass}
+          className={fieldControl}
         />
       </label>
-      <label className="block sm:col-span-2">
-        <span className={formLabelClass}>
-          Phrase <span className="text-red-500">*</span>
+      <label className="search-field-wide block">
+        <span className={fieldLabel}>
+          Phrase <span className="text-red-700">*</span>
         </span>
         <input
           value={draft.query}
           onChange={(e) => setDraft((d) => ({ ...d, query: e.target.value }))}
           required
-          className={formControlClass}
+          className={fieldControl}
         />
       </label>
-      <label className="block sm:col-span-2">
-        <span className={formLabelClass}>Exclude</span>
+      <label className="search-field-wide block">
+        <span className={fieldLabel}>Exclude</span>
         <input
           value={draft.excludeTerms}
           onChange={(e) => setDraft((d) => ({ ...d, excludeTerms: e.target.value }))}
-          className={formControlClass}
+          className={fieldControl}
         />
       </label>
       <label className="block">
-        <span className={formLabelClass}>Max days old</span>
+        <span className={fieldLabel}>Max days old</span>
         <input
           type="number"
           min={1}
           max={30}
           value={draft.maxDaysOld}
           onChange={(e) => setDraft((d) => ({ ...d, maxDaysOld: Number(e.target.value) || 7 }))}
-          className={formControlClass}
+          className={fieldControl}
         />
       </label>
       <label className="block">
-        <span className={formLabelClass}>CV track</span>
+        <span className={fieldLabel}>CV track</span>
         <select
           value={draft.track}
           onChange={(e) => setDraft((d) => ({ ...d, track: e.target.value as CvTrack }))}
-          className={formSelectClass}
+          className={`${fieldControl} form-select`}
         >
           {CV_TRACKS.map((track) => (
             <option key={track} value={track}>

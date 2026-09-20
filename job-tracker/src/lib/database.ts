@@ -29,7 +29,9 @@ export interface JobRow {
   match_score?: number | null
   cv_track?: string | null
   jd_complete?: boolean | null
+  needs_rescore?: boolean | null
   deleted_at?: string | null
+  not_selected?: boolean | null
   created_at: string
   updated_at: string
 }
@@ -144,7 +146,9 @@ export function rowToJob(row: JobRow): JobApplication {
       jdComplete: row.jd_complete ?? undefined,
       source: row.source ?? 'manual',
     }),
+    needsRescore: row.needs_rescore === true,
     deletedAt: row.deleted_at ?? null,
+    notSelected: row.not_selected === true,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -174,7 +178,9 @@ export function jobToRow(job: JobApplication, userId: string): Omit<JobRow, 'cre
     match_score: job.matchScore,
     cv_track: job.cvTrack,
     jd_complete: job.jdComplete,
+    needs_rescore: job.needsRescore === true,
     deleted_at: job.deletedAt,
+    not_selected: job.notSelected === true,
   }
 }
 

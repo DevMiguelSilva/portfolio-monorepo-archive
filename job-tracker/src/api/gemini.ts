@@ -38,6 +38,11 @@ export async function tailorMasterCv(
   })
 }
 
+/** Plain definition of one term. High-quota models, separate from resume tailoring. */
+export async function explainSkill(skill: string): Promise<string> {
+  return callGemini<string>({ action: 'explainSkill', skill })
+}
+
 export async function parseResumeText(
   resumeText: string,
   track: 'frontend' | 'powerPlatform'

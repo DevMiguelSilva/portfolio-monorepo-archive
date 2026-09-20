@@ -1,38 +1,25 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { parseJobPosting } from '../api/gemini'
-import { InterviewFollowUpBadge } from '../components/InterviewFollowUpBadge'
 import { InterviewList } from '../components/InterviewList'
 import { InterviewPrepPanel } from '../components/InterviewPrepPanel'
-import { ScrollToTopButton } from '../components/ScrollToTopButton'
-import { SourceBadge } from '../components/SourceBadge'
-import { StatusBadge } from '../components/StatusBadge'
 import { TailorPanel } from '../components/TailorPanel'
 import { useJobs } from '../hooks/useJobs'
 import { useMasterCv } from '../hooks/useMasterCv'
-import { useSavedSearches } from '../hooks/useSavedSearches'
-import { btnInterviewClass, btnRejectedClass } from '../lib/appUi'
-import {
-  formAccentBtnClass,
-  formControlClass,
-  formLabelClass,
-  formPanelClass,
-  formPrimaryBtnClass,
-  formSelectClass,
-} from '../lib/formUi'
-import { formatDualTrackScores, scoreDualTracks, scoreMasterCvAgainstJob } from '../lib/matchScore'
-import { CV_TRACK_LABELS, CV_TRACKS, type CvTrack } from '../types/cv'
-import { interviewBoardLine, latestInterviewFollowUp, personalNotesText } from '../types/job'
+import { useTailoredDocs } from '../hooks/useTailoredDocs'
+import { BOARD_TONE } from '../lib/boardTone'
+import { scoreMasterCvAgainstJob, withRequirementSignals } from '../lib/matchScore'
+import { jobSourceLabel, latestInterviewFollowUp, personalNotesText, STATUS_CONFIG } from '../types/job'
 
 export function JobDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { getJob, deleteJob, restoreJob, purgeJob, updateJob, moveJob } = useJobs()
   const { getCv, activeTrack, library } = useMasterCv()
-  const { searches } = useSavedSearches()
+  const { getForJob } = useTailoredDocs()
   const job = id ? getJob(id) : undefined
+  const hasResume = Boolean(id && getForJob(id)?.tailoredCv)
   const [showFullJd, setShowFullJd] = useState(false)
-  const [editingTrack, setEditingTrack] = useState(false)
   const [editingJd, setEditingJd] = useState(false)
   const [jdDraft, setJdDraft] = useState('')
   const [savingJd, setSavingJd] = useState(false)
@@ -44,22 +31,20 @@ export function JobDetailPage() {
   const [savingNotes, setSavingNotes] = useState(false)
   const [notesError, setNotesError] = useState<string | null>(null)
 
-  const dual = useMemo(() => {
+  const matchPercent = useMemo(() => {
     if (!job) return null
-    const jobText = `${job.role}\n${job.jobDescription}`
-    return scoreDualTracks(
-      jobText,
-      { frontend: getCv('frontend'), powerPlatform: getCv('powerPlatform') },
+    if (job.matchScore != null) return job.matchScore
+    const track = job.cvTrack ?? activeTrack ?? 'powerPlatform'
+    return scoreMasterCvAgainstJob(
+      `${job.role}\n${job.jobDescription}`,
+      getCv(track),
       job.extractedSkills
-    )
-  }, [job, getCv, library])
+    ).score
+  }, [job, getCv, activeTrack, library])
 
-  const adzunaSearchLabel = useMemo(() => {
-    if (!job || job.source !== 'adzuna' || !job.savedSearchId) return null
-    const search = searches.find((s) => s.id === job.savedSearchId)
-    if (!search) return null
-    return search.label.trim() || search.query.trim() || null
-  }, [job, searches])
+  useEffect(() => {
+    if (!job || job.status !== 'saved' || job.deletedAt) setEditingJd(false)
+  }, [job])
 
   if (!job) {
     return (
@@ -90,11 +75,20 @@ export function JobDetailPage() {
     }
   }
 
-  const selectedTrack = job.cvTrack ?? activeTrack ?? 'powerPlatform'
   const showInterviewPrep = job.status === 'interview'
   const notesText = personalNotesText(job.notes)
-  const interviewLine = job.status === 'interview' ? interviewBoardLine(job.interviews) : null
   const followUp = job.status === 'interview' ? latestInterviewFollowUp(job.interviews) : null
+  const tone = BOARD_TONE[job.deletedAt ? 'trash' : job.status]
+  const statusLabel = job.deletedAt ? 'Trash' : STATUS_CONFIG[job.status].label
+  const statusBtn = (slot: 'saved' | 'applied' | 'interview' | 'offer' | 'rejected' | 'trash') =>
+    `m-action rounded-lg px-4 py-2 text-sm font-semibold transition ${BOARD_TONE[slot].action}`
+  const quietBtn =
+    'rounded-lg border border-[#e6eeeb] bg-white px-4 py-2 text-sm font-semibold text-brand-ink transition hover:bg-[#f4faf8]'
+  const pasteBtn =
+    'rounded-lg border border-[#e6eeeb] bg-white px-4 py-2 text-sm font-semibold text-brand-ink transition hover:border-brand-primary hover:bg-brand-mist'
+  const panel = 'rounded-[1.25rem] border border-[#e6eeeb] bg-white p-6'
+  const field =
+    'mt-2 w-full rounded-lg border border-[#e6eeeb] bg-white px-3 py-2 text-sm leading-relaxed text-brand-ink outline-none transition focus:border-brand-primary'
 
   const saveNotes = async () => {
     setSavingNotes(true)
@@ -110,19 +104,7 @@ export function JobDetailPage() {
   }
 
   const hasUrl = Boolean(job.jobUrl.trim())
-  // Prefer stored score (includes user-claimed gap skills) over raw CV-only dual score.
-  const selectedScore = job.matchScore ?? dual?.[selectedTrack].score ?? null
   const jdIncomplete = !job.jdComplete
-
-  const applyTrack = async (track: CvTrack) => {
-    const match = scoreMasterCvAgainstJob(
-      `${job.role}\n${job.jobDescription}`,
-      getCv(track),
-      job.extractedSkills
-    )
-    await updateJob(job.id, { cvTrack: track, matchScore: match.score })
-    setEditingTrack(false)
-  }
 
   const copyFullJd = async () => {
     const text = job.jobDescription.trim()
@@ -143,8 +125,9 @@ export function JobDetailPage() {
     setShowFullJd(true)
   }
 
-  const saveJd = async (withParse: boolean) => {
-    const fullJd = jdDraft.trim()
+  const saveJd = async (fullJdRaw: string) => {
+    if (job.status !== 'saved' || job.deletedAt) return
+    const fullJd = fullJdRaw.trim()
     if (!fullJd) {
       setJdError('Paste the full job description before saving.')
       return
@@ -152,6 +135,7 @@ export function JobDetailPage() {
 
     setSavingJd(true)
     setJdError(null)
+    setParsingJd(true)
     try {
       let jdSummary = job.jdSummary
       let extractedSkills = job.extractedSkills
@@ -161,40 +145,31 @@ export function JobDetailPage() {
       let location = job.location
       let salary = job.salary
 
-      if (withParse) {
-        setParsingJd(true)
-        try {
-          const parsed = await parseJobPosting(fullJd)
-          jdSummary = parsed.summary || jdSummary
-          if (parsed.skills?.length) extractedSkills = parsed.skills
-          else extractedSkills = []
-          if (parsed.requirements?.length) extractedRequirements = parsed.requirements
-          if (parsed.company) company = parsed.company
-          if (parsed.role) role = parsed.role
-          if (parsed.location) location = parsed.location
-          if (parsed.salary) salary = parsed.salary
-        } catch (err) {
-          // Still save the JD + rescore even if Gemini is down
-          setJdError(
-            err instanceof Error
-              ? `${err.message} — saved description and rescored without AI parse.`
-              : 'AI parse failed — saved description and rescored without AI parse.'
-          )
-          extractedSkills = []
-        } finally {
-          setParsingJd(false)
-        }
-      } else {
-        // Drop snippet-era skills so match mines keywords from the full JD text
+      try {
+        const parsed = await parseJobPosting(fullJd)
+        jdSummary = parsed.summary || jdSummary
+        if (parsed.skills?.length) extractedSkills = parsed.skills
+        else extractedSkills = []
+        if (parsed.requirements?.length) extractedRequirements = parsed.requirements
+        if (parsed.company) company = parsed.company
+        if (parsed.role) role = parsed.role
+        if (parsed.location) location = parsed.location
+        if (parsed.salary) salary = parsed.salary
+      } catch (err) {
+        setJdError(
+          err instanceof Error
+            ? `${err.message} — saved description and rescored without AI parse.`
+            : 'AI parse failed — saved description and rescored without AI parse.'
+        )
         extractedSkills = []
+      } finally {
+        setParsingJd(false)
       }
 
       const track = job.cvTrack ?? activeTrack
-      const match = scoreMasterCvAgainstJob(
-        `${role}\n${fullJd}`,
-        getCv(track),
-        extractedSkills
-      )
+      const described = `${role}\n${fullJd}`
+      extractedSkills = withRequirementSignals(described, extractedSkills)
+      const match = scoreMasterCvAgainstJob(described, getCv(track), extractedSkills)
 
       await updateJob(job.id, {
         jobDescription: fullJd,
@@ -207,6 +182,7 @@ export function JobDetailPage() {
         salary,
         matchScore: match.score,
         jdComplete: true,
+        needsRescore: false,
       })
       setEditingJd(false)
       setShowFullJd(false)
@@ -219,249 +195,226 @@ export function JobDetailPage() {
   }
 
   return (
-    <div className="space-y-8">
-      <Link to="/" className="text-sm text-slate-500 hover:text-track-accent dark:text-slate-400">
+    <div className="space-y-4">
+      <Link to="/" className="text-sm font-medium text-brand-muted hover:text-brand-ink">
         ← Back to board
       </Link>
 
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge status={job.status} size="md" />
-            <SourceBadge source={job.source} size="md" />
-            {followUp && <InterviewFollowUpBadge outcome={followUp} size="md" />}
-            {jdIncomplete && (
-              <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
-                JD incomplete
-              </span>
-            )}
-          </div>
-          <h1 className="mt-2 text-3xl font-bold">{job.role}</h1>
-          <p className="text-lg text-slate-500 dark:text-slate-400">{job.company}</p>
-          <div className="mt-2 flex flex-wrap gap-3 text-sm text-slate-500 dark:text-slate-400">
-            {job.location && <span>📍 {job.location}</span>}
-            {job.salary && <span>💰 {job.salary}</span>}
-            {adzunaSearchLabel && (
-              <span className="font-medium text-slate-600 dark:text-slate-300">
-                via search: {adzunaSearchLabel}
-              </span>
-            )}
-            {job.status !== 'saved' && job.appliedDate && (
-              <span>📅 Applied {job.appliedDate}</span>
-            )}
-            {interviewLine && <span>{interviewLine}</span>}
-            {selectedScore != null && (
-              <span>
-                🎯 {selectedScore}% · {CV_TRACK_LABELS[selectedTrack]}
-                {jdIncomplete ? ' (preview)' : ''}
-              </span>
-            )}
-          </div>
-          {dual && (
-            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-              Coverage vs master CVs:{' '}
-              <span className="font-medium text-slate-700 dark:text-slate-200">
-                {formatDualTrackScores(dual)}
-              </span>
-              {dual.bestTrack !== selectedTrack && (
-                <span className="text-slate-400">
-                  {' '}
-                  · better fit: {CV_TRACK_LABELS[dual.bestTrack]}
-                </span>
-              )}
+      <section className="rounded-[1.25rem] border border-[#e6eeeb] bg-white p-6 sm:p-8">
+        <div className="m-action-row flex flex-wrap items-start justify-between gap-6">
+          <div className="min-w-0">
+            <p className="flex items-baseline gap-2">
+              <span className={`text-sm font-medium ${tone.figure}`}>{statusLabel}</span>
+              <span className="text-[11px] text-brand-muted">{jobSourceLabel(job.source)}</span>
             </p>
-          )}
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          {job.deletedAt ? (
-            <>
-              <span className="self-center rounded-md bg-slate-200 px-2 py-1 text-xs font-medium text-slate-700 dark:bg-track-700 dark:text-slate-200">
-                In Trash
-              </span>
-              <button
-                type="button"
-                onClick={handleRestore}
-                className="rounded-lg bg-track-accent px-3 py-2 text-sm font-medium text-white hover:bg-sky-600"
-              >
-                Restore
-              </button>
-              <button
-                type="button"
-                onClick={handlePurge}
-                className="rounded-lg border border-red-300 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950/30"
-              >
-                Delete forever
-              </button>
-            </>
-          ) : (
-            <>
-              {!job.deletedAt && job.status === 'saved' && job.jdComplete && (
-                <button
-                  type="button"
-                  onClick={() => moveJob(job.id, 'applied')}
-                  className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-800"
-                >
-                  Mark as applied
-                </button>
-              )}
-              {!job.deletedAt && job.status === 'applied' && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => moveJob(job.id, 'interview')}
-                    className={btnInterviewClass}
-                  >
-                    Interview
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => moveJob(job.id, 'rejected')}
-                    className={btnRejectedClass}
-                  >
-                    Rejected
-                  </button>
-                </div>
-              )}
-              {job.status === 'saved' && (
-                <button
-                  type="button"
-                  onClick={handleDelete}
-                  className="rounded-lg border border-red-300 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950/30"
-                >
-                  Move to Trash
-                </button>
-              )}
-            </>
-          )}
-        </div>
-      </div>
-
-      {job.status === 'interview' && (!job.deletedAt || job.interviews.length > 0) && (
-        <InterviewList
-          interviews={job.interviews}
-          readOnly={Boolean(job.deletedAt)}
-          onSave={(interviews) => updateJob(job.id, { interviews })}
-        />
-      )}
-
-      <section className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 sm:grid-cols-2 dark:border-track-700 dark:bg-track-800">
-        <div className="min-w-0">
-          <span className="text-sm font-medium text-slate-500">Posting URL</span>
-          {hasUrl ? (
-            <a
-              href={job.jobUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-1 block truncate text-sm font-medium text-track-accent hover:underline"
-            >
-              Open original posting →
-            </a>
-          ) : (
-            <p className="mt-1 text-sm text-slate-400">No URL on this job</p>
-          )}
-        </div>
-
-        <div className="min-w-0">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-sm font-medium text-slate-500">Master CV</span>
-            {!editingTrack && (
-              <button
-                type="button"
-                onClick={() => setEditingTrack(true)}
-                className="text-xs font-medium text-track-accent hover:underline"
-              >
-                Edit
-              </button>
+            <h1 className="mt-2 font-display text-[1.75rem] font-semibold leading-[1.2] tracking-tight text-brand-ink">
+              {job.role || 'Untitled role'}
+            </h1>
+            <p className="mt-1 truncate text-sm text-brand-muted">{job.company || 'Unknown company'}</p>
+            <p className="truncate text-sm text-brand-muted">
+              {job.location.trim() || 'No location'}
+            </p>
+            <p className={`mt-2 text-sm ${job.salary.trim() ? 'text-brand-ink' : 'text-brand-muted'}`}>
+              {job.salary.trim() || 'No salary yet'}
+            </p>
+            {job.status !== 'saved' && (job.appliedDate || matchPercent != null) && (
+              <p className="mt-2 text-sm text-brand-muted">
+                {[
+                  job.appliedDate ? `Applied ${job.appliedDate}` : null,
+                  matchPercent != null ? `${matchPercent}% match` : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </p>
+            )}
+            {job.deletedAt && (
+              <p className="mt-1 text-xs text-brand-muted">Was {STATUS_CONFIG[job.status].label}</p>
+            )}
+            {job.status === 'interview' && job.notSelected && (
+              <p className="pt-2 text-sm text-brand-muted">Not selected</p>
+            )}
+            {job.status === 'interview' && !job.notSelected && followUp === 'pending' && (
+              <p className="pt-2 text-sm text-emerald-700">Interview booked</p>
+            )}
+            {job.status === 'interview' && !job.notSelected && followUp === 'waiting' && (
+              <p className="pt-2 text-sm text-emerald-700">Waiting for an answer</p>
+            )}
+            {jdIncomplete && !job.needsRescore && (
+              <p className="pt-2 text-sm text-[#8a6230]">Description incomplete</p>
             )}
           </div>
-          {editingTrack ? (
-            <div className="mt-1 space-y-2">
-              <select
-                value={selectedTrack}
-                onChange={(e) => applyTrack(e.target.value as CvTrack)}
-                className={formSelectClass}
-              >
-                {CV_TRACKS.map((track) => (
-                  <option key={track} value={track}>
-                    {CV_TRACK_LABELS[track]}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={() => setEditingTrack(false)}
-                className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs dark:border-track-700"
-              >
-                Cancel
-              </button>
-            </div>
-          ) : (
-            <p className="mt-1 text-sm font-medium">{CV_TRACK_LABELS[selectedTrack]}</p>
-          )}
+
+          <div className="m-actions flex flex-wrap gap-2">
+            {job.deletedAt ? (
+              <>
+                <button type="button" data-slot="saved" data-role="primary" onClick={handleRestore} className={statusBtn('saved')}>
+                  Restore
+                </button>
+                <button type="button" data-slot="rejected" onClick={handlePurge} className={statusBtn('rejected')}>
+                  Delete
+                </button>
+              </>
+            ) : (
+              <>
+                {job.status === 'saved' && job.jdComplete && hasResume && (
+                  <button
+                    type="button"
+                    data-slot="applied"
+                    data-role="primary"
+                    onClick={() => moveJob(job.id, 'applied')}
+                    className={statusBtn('applied')}
+                  >
+                    Mark as applied
+                  </button>
+                )}
+                {job.status === 'applied' && (
+                  <>
+                    <button
+                      type="button"
+                      data-slot="interview"
+                      data-role="primary"
+                      onClick={() => moveJob(job.id, 'interview')}
+                      className={statusBtn('interview')}
+                    >
+                      Interview
+                    </button>
+                    <button type="button" data-slot="rejected" onClick={() => moveJob(job.id, 'rejected')} className={statusBtn('rejected')}>
+                      Rejected
+                    </button>
+                  </>
+                )}
+                {job.status === 'interview' &&
+                  !job.notSelected &&
+                  job.interviews.length > 0 &&
+                  job.interviews.every((round) => round.done) && (
+                  <>
+                    <button
+                      type="button"
+                      data-slot="offer"
+                      data-role="primary"
+                      onClick={() => moveJob(job.id, 'offer')}
+                      className={statusBtn('offer')}
+                    >
+                      Offer
+                    </button>
+                    {!job.notSelected && (
+                      <button
+                        type="button"
+                        data-role="quiet"
+                        onClick={() => updateJob(job.id, { notSelected: true })}
+                        className={`${quietBtn} m-action`}
+                      >
+                        Not selected
+                      </button>
+                    )}
+                  </>
+                )}
+                {job.status === 'saved' && (
+                  <button type="button" data-slot="trash" onClick={handleDelete} className={statusBtn('trash')}>
+                    Move to trash
+                  </button>
+                )}
+              </>
+            )}
+          </div>
         </div>
+
+        {job.status === 'interview' && (!job.deletedAt || job.interviews.length > 0) && (
+          <div className="mt-6">
+            <InterviewList
+              interviews={job.interviews}
+              readOnly={Boolean(job.deletedAt) || job.notSelected}
+              embedded
+              onSave={(interviews) =>
+                updateJob(job.id, {
+                  interviews,
+                  ...(interviews.some((round) => !round.done) ? { notSelected: false } : {}),
+                })
+              }
+            />
+          </div>
+        )}
       </section>
 
-      {(jdIncomplete || editingJd) && (
-        <section
-          className={`space-y-3 rounded-xl border p-5 ${
-            jdIncomplete
-              ? 'border-amber-300 bg-amber-50/60 dark:border-amber-800 dark:bg-amber-950/20'
-              : 'border-slate-200 bg-white dark:border-track-700 dark:bg-track-800'
-          }`}
-        >
-          <div>
-            <h2 className="font-semibold">
-              {jdIncomplete ? 'Complete the job description' : 'Update job description'}
-            </h2>
-          </div>
+      <section className={panel}>
+        <span className="text-sm text-brand-muted">Posting URL</span>
+        {hasUrl ? (
+          <a
+            href={job.jobUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1 block truncate text-sm text-brand-ink underline-offset-4 transition hover:text-brand-primaryDeep hover:underline"
+          >
+            Open original posting
+          </a>
+        ) : (
+          <p className="mt-1 text-sm text-brand-muted">No URL on this job</p>
+        )}
+      </section>
+
+      {job.status === 'saved' && !job.deletedAt && (jdIncomplete || editingJd) && (
+        <section className={`${panel} space-y-4`}>
+          <h2 className="font-display text-base font-semibold text-brand-ink">Job description</h2>
 
           {!editingJd ? (
-            <button type="button" onClick={openJdEditor} className={formAccentBtnClass}>
-              Paste full job description
-            </button>
+            job.needsRescore ? (
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  data-role="primary"
+                  disabled={savingJd || parsingJd}
+                  onClick={() => void saveJd(job.jobDescription)}
+                  className={`${pasteBtn} m-action disabled:opacity-60`}
+                >
+                  {parsingJd || savingJd ? 'Rescoring…' : 'Rescore'}
+                </button>
+                {jdError && (
+                  <p className="text-sm text-[#8a6230]" role="alert">
+                    {jdError}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <button type="button" data-role="primary" onClick={openJdEditor} className={`${quietBtn} m-action`}>
+                Paste full job description
+              </button>
+            )
           ) : (
-            <div className={formPanelClass}>
+            <div className="space-y-3">
               <label className="block">
-                <span className={formLabelClass}>Full job description</span>
+                <span className="text-sm text-brand-muted">Full job description</span>
                 <textarea
                   value={jdDraft}
                   onChange={(e) => setJdDraft(e.target.value)}
                   rows={12}
                   placeholder="Paste the complete job posting here…"
-                  className={`${formControlClass} font-mono text-xs leading-relaxed`}
+                  className={field}
                 />
               </label>
               {jdError && (
-                <p className="text-sm text-amber-700 dark:text-amber-300" role="alert">
+                <p className="text-sm text-[#8a6230]" role="alert">
                   {jdError}
                 </p>
               )}
-              <div className="flex flex-wrap gap-2">
+              <div className="m-actions flex flex-wrap gap-2">
                 <button
                   type="button"
+                  data-role="primary"
                   disabled={savingJd || parsingJd}
-                  onClick={() => saveJd(true)}
-                  className={`${formAccentBtnClass} disabled:opacity-60`}
+                  onClick={() => void saveJd(jdDraft)}
+                  className={`${pasteBtn} m-action disabled:opacity-60`}
                 >
                   {parsingJd ? 'Parsing…' : savingJd ? 'Saving…' : 'Parse, save & rescore'}
                 </button>
                 <button
                   type="button"
-                  disabled={savingJd || parsingJd}
-                  onClick={() => saveJd(false)}
-                  className={`${formPrimaryBtnClass} disabled:opacity-60`}
-                >
-                  {savingJd && !parsingJd ? 'Saving…' : 'Save & rescore'}
-                </button>
-                <button
-                  type="button"
+                  data-role="quiet"
                   disabled={savingJd || parsingJd}
                   onClick={() => {
                     setEditingJd(false)
                     setJdError(null)
                   }}
-                  className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm dark:border-track-700"
+                  className={`${quietBtn} m-action disabled:opacity-60`}
                 >
                   Cancel
                 </button>
@@ -475,35 +428,29 @@ export function JobDetailPage() {
         job.extractedSkills.length > 0 ||
         job.extractedRequirements.length > 0 ||
         job.jobDescription) && (
-        <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 dark:border-track-700 dark:bg-track-800">
+        <section className={`${panel} space-y-4`}>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="font-semibold">Posting overview</h2>
-            {job.jdComplete && !editingJd && (
-              <button
-                type="button"
-                onClick={openJdEditor}
-                className="text-xs font-medium text-track-accent hover:underline"
-              >
-                Update JD
+            <h2 className="font-display text-base font-semibold text-brand-ink">Posting overview</h2>
+            {job.status === 'saved' && !job.deletedAt && job.jdComplete && !editingJd && (
+              <button type="button" onClick={openJdEditor} className={quietBtn}>
+                Update
               </button>
             )}
           </div>
           {job.jdSummary && (
             <div>
-              <h3 className="mb-1 text-sm font-medium text-slate-500">AI summary</h3>
-              <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-300">
-                {job.jdSummary}
-              </p>
+              <h3 className="mb-1 text-sm text-brand-muted">Summary</h3>
+              <p className="text-sm leading-relaxed text-brand-ink">{job.jdSummary}</p>
             </div>
           )}
           {job.extractedSkills.length > 0 && (
             <div>
-              <h3 className="mb-2 text-sm font-medium text-slate-500">Skills from JD</h3>
+              <h3 className="mb-2 text-sm text-brand-muted">Skills from the posting</h3>
               <div className="flex flex-wrap gap-2">
                 {job.extractedSkills.map((skill) => (
                   <span
                     key={skill}
-                    className="rounded-full bg-sky-50 px-3 py-1 text-sm text-sky-600 dark:bg-sky-950/50 dark:text-sky-400"
+                    className="rounded-lg bg-[#f4faf8] px-2.5 py-1 text-sm text-brand-ink"
                   >
                     {skill}
                   </span>
@@ -513,11 +460,11 @@ export function JobDetailPage() {
           )}
           {job.extractedRequirements.length > 0 && (
             <div>
-              <h3 className="mb-2 text-sm font-medium text-slate-500">Requirements</h3>
-              <ul className="space-y-1 text-sm text-slate-600 dark:text-slate-300">
+              <h3 className="mb-2 text-sm text-brand-muted">Requirements</h3>
+              <ul className="space-y-1 text-sm text-brand-ink">
                 {job.extractedRequirements.map((req) => (
                   <li key={req} className="flex gap-2">
-                    <span className="text-track-accent">•</span>
+                    <span className="text-brand-muted">•</span>
                     {req}
                   </li>
                 ))}
@@ -526,30 +473,22 @@ export function JobDetailPage() {
           )}
 
           {job.jobDescription ? (
-            <div className="border-t border-slate-100 pt-3 dark:border-track-700">
+            <div className="border-t border-[#e6eeeb] pt-4">
               {showFullJd ? (
                 <>
-                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="font-semibold">Job description</h3>
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => void copyFullJd()}
-                        className="text-xs text-track-accent hover:underline"
-                      >
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-sm text-brand-muted">Full text</h3>
+                    <div className="flex items-center gap-2">
+                      <button type="button" onClick={() => void copyFullJd()} className={quietBtn}>
                         {jdCopied ? 'Copied' : 'Copy'}
                       </button>
-                      <button
-                        type="button"
-                        className="text-xs text-slate-500 hover:underline"
-                        onClick={() => setShowFullJd(false)}
-                      >
+                      <button type="button" onClick={() => setShowFullJd(false)} className={quietBtn}>
                         Close
                       </button>
                     </div>
                   </div>
                   <div
-                    className="max-h-[28rem] overflow-y-auto whitespace-pre-wrap text-sm leading-relaxed text-slate-700 dark:text-slate-300"
+                    className="max-h-[28rem] overflow-y-auto whitespace-pre-wrap text-sm leading-relaxed text-brand-ink"
                     role="region"
                     aria-label="Job description"
                   >
@@ -559,8 +498,9 @@ export function JobDetailPage() {
               ) : (
                 <button
                   type="button"
+                  data-role="quiet"
                   onClick={() => setShowFullJd(true)}
-                  className="text-sm font-medium text-track-accent hover:underline"
+                  className={`${quietBtn} m-action`}
                   aria-expanded={false}
                 >
                   {jdIncomplete ? 'Show listing preview' : 'Show full job description'}
@@ -568,14 +508,14 @@ export function JobDetailPage() {
               )}
             </div>
           ) : (
-            <p className="text-sm text-slate-500">No JD saved yet.</p>
+            <p className="text-sm text-brand-muted">No description saved yet.</p>
           )}
         </section>
       )}
 
-      <section className="space-y-2 rounded-xl border border-slate-200 bg-white p-5 dark:border-track-700 dark:bg-track-800">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="font-semibold">Personal notes</h2>
+      <section className={`${panel} space-y-4`}>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-display text-base font-semibold text-brand-ink">Personal notes</h2>
           {!editingNotes && (
             <button
               type="button"
@@ -584,60 +524,59 @@ export function JobDetailPage() {
                 setNotesError(null)
                 setEditingNotes(true)
               }}
-              className="text-xs font-medium text-track-accent hover:underline"
+              className={quietBtn}
             >
               Edit
             </button>
           )}
         </div>
         {editingNotes ? (
-          <div className="space-y-2">
+          <div className="space-y-3">
             <textarea
               value={notesDraft}
               onChange={(e) => setNotesDraft(e.target.value)}
               rows={4}
               placeholder="Recruiter name, follow-ups, anything you want to remember…"
-              className={formControlClass}
+              className={field}
             />
             {notesError && (
-              <p className="text-sm text-amber-700 dark:text-amber-300" role="alert">
+              <p className="text-sm text-[#8a6230]" role="alert">
                 {notesError}
               </p>
             )}
-            <div className="flex flex-wrap gap-2">
+            <div className="m-actions flex flex-wrap gap-2">
               <button
                 type="button"
+                data-role="primary"
                 disabled={savingNotes}
                 onClick={() => void saveNotes()}
-                className={`${formPrimaryBtnClass} disabled:opacity-60`}
+                className={`${pasteBtn} m-action disabled:opacity-60`}
               >
                 {savingNotes ? 'Saving…' : 'Save'}
               </button>
               <button
                 type="button"
+                data-role="quiet"
                 disabled={savingNotes}
                 onClick={() => {
                   setEditingNotes(false)
                   setNotesError(null)
                 }}
-                className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm dark:border-track-700"
+                className={`${quietBtn} m-action disabled:opacity-60`}
               >
                 Cancel
               </button>
             </div>
           </div>
         ) : notesText.trim() ? (
-          <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700 dark:text-slate-300">
-            {notesText}
-          </p>
+          <p className="whitespace-pre-wrap text-sm leading-relaxed text-brand-ink">{notesText}</p>
         ) : (
-          <p className="text-sm text-slate-500">No notes yet.</p>
+          <p className="text-sm text-brand-muted">No notes yet.</p>
         )}
       </section>
 
       {showInterviewPrep && <InterviewPrepPanel job={job} />}
       {job.jdComplete && <TailorPanel job={job} />}
-      <ScrollToTopButton />
     </div>
   )
 }

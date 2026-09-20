@@ -1,1 +1,1 @@
-{"root":["./vite.config.ts"],"version":"5.9.3"}
+{"root":["./vite.config.ts","./api/gemini.ts","./api/_lib/adzuna.ts","./api/_lib/env.ts","./api/_lib/gemini.ts","./api/_lib/handlers.ts","./api/adzuna/search.ts"],"version":"5.9.3"}
