@@ -76,8 +76,7 @@ export function MasterCvPage() {
   }
   const saveDraft = async () => { if (draft) await saveTemplate(editingTrack, draft, pendingAttachment) }
   const switchTrack = (track: CvTrack) => run(async () => {
-    await saveDraft()
-    await setActiveTrack(track)
+    await setActiveTrack(track, draft ? {track:editingTrack, cv:draft, attachment:pendingAttachment} : undefined)
     setDraft(null)
     setPendingAttachment(undefined)
   })
@@ -159,7 +158,7 @@ export function MasterCvPage() {
       </form>}
       <section className={card}>
         <label className="block text-sm font-medium">Selected CV<select aria-label="Selected CV" disabled={locked} className={`${field} mt-2`} value={editingTrack} onChange={(e) => void switchTrack(e.target.value)}>{Object.keys(library.cvs).map((id) => <option key={id} value={id}>{getLabel(id)}</option>)}</select></label>
-        <div className="flex flex-wrap items-center gap-2"><span className="mr-auto text-xs text-brand-muted">Used by default for new applications</span><button type="button" className={button} disabled={locked} onClick={() => setRename(getLabel(editingTrack))}>Rename</button><button type="button" className={`${button} text-red-700`} disabled={locked || Object.keys(library.cvs).length <= 1} onClick={() => { setReplacement(''); setDeleting(editingTrack) }}>Delete</button></div>
+        <div className="flex flex-wrap items-center gap-2"><span className="mr-auto text-xs text-brand-muted">Used by default for new applications</span><button type="button" className={button} disabled={locked} onClick={() => setRename(getLabel(editingTrack))}>Rename</button><CvDeleteButton label={`Delete ${getLabel(editingTrack)} template`} disabled={locked || Object.keys(library.cvs).length <= 1} onClick={() => { setReplacement(''); setDeleting(editingTrack) }} /></div>
         {rename !== null && <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); void run(async () => { await renameTemplate(editingTrack, rename); setRename(null) }) }}><label className="block text-sm">Template name<input className={`${field} mt-1`} required disabled={locked} value={rename} onChange={(e) => setRename(e.target.value)} /></label><div className="flex min-w-0 gap-2"><button className={button} disabled={locked || !rename.trim()}>Save name</button><button type="button" className={button} disabled={locked} onClick={() => setRename(null)}>Cancel</button></div></form>}
       </section>
       <dialog ref={dialog} onCancel={(e) => { if (locked) e.preventDefault(); else setDeleting(null) }} className="w-[calc(100%-2rem)] max-w-lg rounded-2xl border border-[#e6eeeb] bg-white p-6 text-brand-ink backdrop:bg-brand-ink/30">
@@ -167,7 +166,7 @@ export function MasterCvPage() {
           {needsReplacement && <><p className="text-sm">Choose a replacement for these saved references:</p><ul className="max-h-40 space-y-1 overflow-auto text-sm">{refs.jobs.map((job) => <li key={job.id} className="break-words">Job: {job.role} at {job.company}</li>)}{refs.searches.map((search) => <li key={search.id} className="break-words">Search: {search.label || search.query}</li>)}</ul></>}
           <label className="block text-sm">Replacement CV{!needsReplacement && ' (optional)'}<select aria-label="Replacement CV" className={`${field} mt-1`} disabled={locked} value={replacement} onChange={(e) => setReplacement(e.target.value)}><option value="">{needsReplacement ? 'Choose a CV' : 'Use another remaining CV'}</option>{Object.keys(library.cvs).filter((id) => id !== deleting).map((id) => <option key={id} value={id}>{getLabel(id)}</option>)}</select></label>
           {importError && <p role="alert" className="text-sm text-red-700">{importError}</p>}
-          <div className="flex flex-wrap gap-2"><button className={`${button} text-red-700`} disabled={locked || (needsReplacement && !replacement)} onClick={() => void run(async () => { await deleteTemplate(deleting, replacement || undefined); setDeleting(null); setDraft(null); setPendingAttachment(undefined) })}>{busy ? 'Deleting…' : 'Delete template'}</button><button className={button} disabled={locked} onClick={() => setDeleting(null)}>Cancel</button></div>
+          <div className="flex flex-wrap gap-2"><CvDeleteButton label="Delete template" disabled={locked || (needsReplacement && !replacement)} onClick={() => void run(async () => { await deleteTemplate(deleting, replacement || undefined); setDeleting(null); setDraft(null); setPendingAttachment(undefined) })} />{busy && <span role="status" className="self-center text-sm text-brand-muted">Deleting…</span>}<button className={button} disabled={locked} onClick={() => setDeleting(null)}>Cancel</button></div>
         </div>}
       </dialog>
       <fieldset disabled={locked} className="min-w-0 space-y-6">
@@ -327,13 +326,10 @@ function SkillGroupsEditor({
               }}
               className="min-w-0 w-full rounded-lg border border-[#e6eeeb] px-3 py-2 text-sm"
             />
-            <button
-              type="button"
-              className="text-xs text-red-500"
+            <CvDeleteButton
+              label={`Remove ${group.group || 'skill'} group`}
               onClick={() => onChange(skills.filter((g) => g.id !== group.id))}
-            >
-              Remove
-            </button>
+            />
           </div>
           <input
             value={group.items.join(', ')}
@@ -357,21 +353,18 @@ function SkillGroupsEditor({
   )
 }
 
-function RemoveCardButton({ onClick, label }: { onClick: () => void; label: string }) {
+function CvDeleteButton({ onClick, label, disabled }: { onClick: () => void; label: string; disabled?: boolean }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       aria-label={label}
       title={label}
-      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#e6eeeb] text-brand-muted transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#e6eeeb] bg-white text-brand-muted transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
     >
-      <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4" aria-hidden>
-        <path
-          fillRule="evenodd"
-          d="M8.75 3a.75.75 0 0 0-.75.75V5H5.5a.75.75 0 0 0 0 1.5h.59l.55 9.07A1.75 1.75 0 0 0 8.38 17h3.24a1.75 1.75 0 0 0 1.74-1.43l.55-9.07h.59a.75.75 0 0 0 0-1.5H12V3.75A.75.75 0 0 0 11.25 3h-2.5ZM10 6.5c-.28 0-.52.2-.57.47l-.7 4.5a.575.575 0 1 0 1.14.18l.7-4.5A.575.575 0 0 0 10 6.5Zm2.07.47a.575.575 0 0 0-1.14-.18l-.7 4.5a.575.575 0 1 0 1.14.18l.7-4.5Z"
-          clipRule="evenodd"
-        />
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="h-4 w-4" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 6h18M9 6V4h6v2M5 6l1 14h12l1-14M10 10v6M14 10v6" />
       </svg>
     </button>
   )
@@ -416,7 +409,7 @@ function ExperienceEditor({
             <p className="pt-1.5 text-xs font-medium uppercase tracking-wide text-brand-muted">
               Role {index + 1}
             </p>
-            <RemoveCardButton
+            <CvDeleteButton
               label="Remove role"
               onClick={() => onChange(experience.filter((e) => e.id !== exp.id))}
             />
@@ -550,7 +543,7 @@ function ProjectsEditor({
             <p className="pt-1.5 text-xs font-medium uppercase tracking-wide text-brand-muted">
               Project {index + 1}
             </p>
-            <RemoveCardButton
+            <CvDeleteButton
               label="Remove project"
               onClick={() => onChange(projects.filter((p) => p.id !== project.id))}
             />
@@ -651,7 +644,7 @@ function EducationEditor({
             <p className="pt-1.5 text-xs font-medium uppercase tracking-wide text-brand-muted">
               Education {index + 1}
             </p>
-            <RemoveCardButton
+            <CvDeleteButton
               label="Remove education"
               onClick={() => onChange(education.filter((e) => e.id !== edu.id))}
             />
@@ -736,7 +729,7 @@ function CertificationsEditor({
             <p className="pt-1.5 text-xs font-medium uppercase tracking-wide text-brand-muted">
               Certification {index + 1}
             </p>
-            <RemoveCardButton
+            <CvDeleteButton
               label="Remove certification"
               onClick={() => onChange(certifications.filter((c) => c.id !== cert.id))}
             />

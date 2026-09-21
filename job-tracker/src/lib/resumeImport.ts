@@ -1,4 +1,3 @@
-import mammoth from 'mammoth'
 import type { CvCertification, CvEducation, MasterCv } from '../types/cv'
 import { createEmptyMasterCv, formatEducationDates, normalizeEducationEntry } from '../types/cv'
 
@@ -46,6 +45,7 @@ export async function extractTextFromResumeFile(file: File): Promise<string> {
     file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
   ) {
     const buffer = await file.arrayBuffer()
+    const { default: mammoth } = await import('mammoth')
     const result = await mammoth.extractRawText({ arrayBuffer: buffer })
     return (result.value || '').slice(0, MAX_CHARS)
   }
