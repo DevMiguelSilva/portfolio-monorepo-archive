@@ -15,7 +15,7 @@ export function Layout() {
       } ${showTabs ? 'pb-[calc(6.25rem+env(safe-area-inset-bottom))] sm:pb-0' : ''}`}
     >
       <Header />
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
+      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
         <Outlet />
       </main>
       <footer className="border-t border-slate-200/80 py-6 text-center text-xs text-slate-500">
