@@ -82,6 +82,12 @@ alter table saved_searches add column if not exists what_and text not null defau
 alter table saved_searches add column if not exists what_phrase text not null default '';
 alter table job_applications add column if not exists saved_search_id uuid references saved_searches on delete set null;
 alter table job_applications add column if not exists cv_track text;
+alter table job_applications add column if not exists interview_stage text;
+alter table job_applications add column if not exists interview_date text not null default '';
+alter table job_applications drop constraint if exists job_applications_interview_stage_check;
+alter table job_applications add constraint job_applications_interview_stage_check
+  check (interview_stage is null or interview_stage in ('preparing', 'waiting'));
+alter table job_applications add column if not exists interviews jsonb not null default '[]'::jsonb;
 alter table job_inbox add column if not exists matched_track text;
 
 create table if not exists job_inbox (

@@ -11,12 +11,26 @@ import {
 } from '../lib/applyStreak'
 import { collectSearchHits } from '../lib/jobSearch'
 import { pageCardClass, pageCardHoverClass, btnPrimaryClass } from '../lib/appUi'
-import { STATUS_CONFIG, STATUS_ORDER } from '../types/job'
+import {
+  INTERVIEW_FOLLOW_UP_LABEL,
+  interviewBoardLine,
+  latestInterviewFollowUp,
+  STATUS_CONFIG,
+  STATUS_ORDER,
+  type JobApplication,
+} from '../types/job'
 import { useJobs } from '../hooks/useJobs'
 
-function hitColumnLabel(trashed: boolean, status: string): string {
+function hitColumnLabel(trashed: boolean, job: JobApplication): string {
   if (trashed) return 'Trash'
-  return STATUS_CONFIG[status as keyof typeof STATUS_CONFIG]?.label ?? status
+  const label = STATUS_CONFIG[job.status]?.label ?? job.status
+  if (job.status === 'interview') {
+    const line = interviewBoardLine(job.interviews)
+    const followUp = latestInterviewFollowUp(job.interviews)
+    const followLabel = followUp ? INTERVIEW_FOLLOW_UP_LABEL[followUp] : null
+    return [label, line, followLabel].filter(Boolean).join(' · ')
+  }
+  return label
 }
 
 export function DashboardPage() {
@@ -217,7 +231,7 @@ export function DashboardPage() {
                   {job.company || 'Unknown'} · {job.role || 'Untitled'}
                 </span>
                 <span className="shrink-0 text-slate-400">
-                  {hitColumnLabel(trashed, job.status)}
+                  {hitColumnLabel(trashed, job)}
                 </span>
               </Link>
             ))}
