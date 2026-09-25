@@ -1,9 +1,10 @@
 /**
  * Live demo URLs — env vars in Vercel override these fallbacks.
- * jobTracker: legacy Vercel hostname (rename project in Vercel dashboard if desired).
+ * jobTracker must be the Git-connected project (job-tracker), not the older
+ * applytrack-board project, which does not receive pushes from this repo.
  */
 export const LIVE_URLS = {
-  jobTracker: 'https://applytrack-board.vercel.app',
+  jobTracker: 'https://job-tracker-miguel-381c.vercel.app',
   fitTracker: 'https://fittrack-logbook.vercel.app',
 }
 
