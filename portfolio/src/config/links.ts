@@ -17,7 +17,12 @@ function resolveLiveUrl(envValue: string | undefined, fallback: string): string 
 }
 
 export function getJobTrackerUrl(): string {
-  return resolveLiveUrl(import.meta.env.VITE_JOB_TRACKER_URL, LIVE_URLS.jobTracker)
+  const configured = import.meta.env.VITE_JOB_TRACKER_URL
+  // Older Vercel env still names the project that does not receive git deploys.
+  if (configured?.includes('applytrack-board.vercel.app')) {
+    return LIVE_URLS.jobTracker
+  }
+  return resolveLiveUrl(configured, LIVE_URLS.jobTracker)
 }
 
 export function getFitTrackerUrl(): string {
