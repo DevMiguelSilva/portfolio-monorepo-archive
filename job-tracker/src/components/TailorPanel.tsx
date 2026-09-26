@@ -68,6 +68,7 @@ export function TailorPanel({ job }: TailorPanelProps) {
   }))
   /** Panels start collapsed even when saved results exist. */
   const [openPanels, setOpenPanels] = useState<Set<PanelId>>(() => new Set())
+  const [liteDraft, setLiteDraft] = useState(false)
 
   const claimedSkills = job.claimedSkills ?? []
   const showGap = openPanels.has('gap')
@@ -94,6 +95,7 @@ export function TailorPanel({ job }: TailorPanelProps) {
   const run = async (action: string, fn: () => Promise<void>) => {
     setLoading(action)
     setError(null)
+    if (action === 'tailor') setLiteDraft(false)
     try {
       await fn()
     } catch (err) {
@@ -170,6 +172,7 @@ export function TailorPanel({ job }: TailorPanelProps) {
       if (!letter) {
         throw new Error('Tailor did not return a cover letter — try Re-run.')
       }
+      setLiteDraft(Boolean(result.tailorModel?.includes('flash-lite')))
       setTailoredCv(next)
       setGapReport(gap)
       setCoverLetter(letter)
@@ -284,6 +287,12 @@ export function TailorPanel({ job }: TailorPanelProps) {
       {error && (
         <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-300">
           {error}
+        </p>
+      )}
+      {liteDraft && !error && (
+        <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+          Draft written with the lighter model because the main models were busy. Tailor again in a
+          minute for a stronger version.
         </p>
       )}
 

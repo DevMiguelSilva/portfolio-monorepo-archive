@@ -1,8 +1,7 @@
 import {
   getGeminiApiKey,
   getGeminiLiteModel,
-  getGeminiTailorFallbackModel,
-  getGeminiTailorModel,
+  getGeminiTailorModels,
   type ServerEnv,
 } from './env.js'
 
@@ -10,17 +9,23 @@ async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-export class GeminiRateLimitError extends Error {
-  constructor(message = 'Gemini rate limit reached. Wait a minute and try again, or check quota at https://ai.dev/rate-limit') {
+/** A failed attempt that should move on to the next model in a chain. */
+export class GeminiTryNextModelError extends Error {
+  readonly reason: 'rate_limit' | 'unavailable' | 'not_found' | 'empty'
+
+  constructor(reason: GeminiTryNextModelError['reason'], message: string) {
     super(message)
-    this.name = 'GeminiRateLimitError'
+    this.name = 'GeminiTryNextModelError'
+    this.reason = reason
   }
 }
+
+const UNAVAILABLE_STATUSES = new Set([500, 502, 503, 504])
 
 export async function generateGeminiText(
   prompt: string,
   env: ServerEnv,
-  options: { maxOutputTokens?: number; retries?: number; model?: string } = {}
+  options: { maxOutputTokens?: number; retries?: number; model?: string; failover?: boolean } = {}
 ): Promise<string> {
   const apiKey = getGeminiApiKey(env)
   const model = options.model || getGeminiLiteModel(env)
@@ -48,24 +53,42 @@ export async function generateGeminiText(
         candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
       }
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text
-      if (!text) throw new Error('AI returned an empty response')
+      if (!text) {
+        const empty = new GeminiTryNextModelError('empty', 'AI returned an empty response')
+        if (options.failover) throw empty
+        throw new Error(empty.message)
+      }
       return text.trim()
     }
 
-    const errorBody = await response.text()
     if (response.status === 404) {
-      throw new Error(
-        `Model "${model}" not found. Set GEMINI_MODEL_LITE / GEMINI_MODEL_TAILOR (e.g. gemini-3.5-flash-lite, gemini-3.6-flash).`
-      )
+      await response.text().catch(() => '')
+      const missing = new GeminiTryNextModelError('not_found', `Model "${model}" was not found.`)
+      if (options.failover) throw missing
+      throw new Error(missing.message)
     }
-    if (response.status === 429) {
-      lastError = new GeminiRateLimitError()
+
+    if (response.status === 429 || UNAVAILABLE_STATUSES.has(response.status)) {
+      await response.text().catch(() => '')
+      lastError = new GeminiTryNextModelError(
+        response.status === 429 ? 'rate_limit' : 'unavailable',
+        response.status === 429
+          ? 'Gemini rate limit reached. Wait a minute and try again.'
+          : 'This model is busy right now.'
+      )
       if (attempt < retries) {
         await sleep(800 * (attempt + 1))
         continue
       }
-      throw lastError
+      if (options.failover) throw lastError
+      throw new Error(
+        response.status === 429
+          ? 'Gemini rate limit reached. Wait a minute and try again, or check quota at https://ai.dev/rate-limit'
+          : 'The AI model is busy right now. Wait a minute and try again.'
+      )
     }
+
+    const errorBody = await response.text()
     throw new Error(`AI request failed (${response.status}): ${errorBody.slice(0, 400)}`)
   }
 
@@ -85,42 +108,47 @@ export async function generateGeminiLiteText(
 }
 
 /**
- * Tailor: try strongest model first, then fallback when quota/rate-limited.
- * Uses fewer intra-model retries so we can switch models sooner.
+ * Tailor: 3.8, then 3.7, then 3.6, then Flash Lite.
+ * Switch immediately on 429, 503, a missing model, or an empty reply.
  */
 export async function generateGeminiTailorText(
   prompt: string,
   env: ServerEnv,
   options: { maxOutputTokens?: number } = {}
-): Promise<string> {
-  const primary = getGeminiTailorModel(env)
-  const fallback = getGeminiTailorFallbackModel(env)
+): Promise<{ text: string; model: string }> {
+  const models = getGeminiTailorModels(env)
   const maxOutputTokens = options.maxOutputTokens ?? 8192
+  let sawBusy = false
+  let sawJson = false
 
-  try {
-    return await generateGeminiText(prompt, env, {
-      model: primary,
-      maxOutputTokens,
-      retries: 1,
-    })
-  } catch (err) {
-    if (!(err instanceof GeminiRateLimitError)) throw err
-    if (fallback === primary) throw err
+  for (const model of models) {
     try {
-      return await generateGeminiText(prompt, env, {
-        model: fallback,
+      const text = await generateGeminiText(prompt, env, {
+        model,
         maxOutputTokens,
-        retries: 1,
+        retries: 0,
+        failover: true,
       })
-    } catch (fallbackErr) {
-      if (fallbackErr instanceof GeminiRateLimitError) {
-        throw new GeminiRateLimitError(
-          `Tailor rate limit on ${primary} and ${fallback}. Try again tomorrow or check quota at https://ai.dev/rate-limit`
-        )
+      try {
+        extractJsonObject(text)
+      } catch {
+        sawJson = true
+        continue
       }
-      throw fallbackErr
+      return { text, model }
+    } catch (err) {
+      if (!(err instanceof GeminiTryNextModelError)) throw err
+      if (err.reason !== 'not_found') sawBusy = true
     }
   }
+
+  if (sawBusy) {
+    throw new Error('The writing models are busy right now. Wait a minute and try Tailor again.')
+  }
+  if (sawJson) {
+    throw new Error('The models returned an unreadable resume. Wait a minute and try Tailor again.')
+  }
+  throw new Error(`None of the tailor models are available (${models.join(', ')}).`)
 }
 
 export function extractJsonObject<T>(text: string): T {

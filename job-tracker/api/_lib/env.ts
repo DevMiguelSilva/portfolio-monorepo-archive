@@ -2,15 +2,20 @@ export interface ServerEnv {
   ADZUNA_APP_ID?: string
   ADZUNA_APP_KEY?: string
   GEMINI_API_KEY?: string
-  /** @deprecated Prefer GEMINI_MODEL_LITE / GEMINI_MODEL_TAILOR / GEMINI_MODEL_TAILOR_FALLBACK */
+  /** @deprecated Prefer GEMINI_MODEL_LITE. Not used for tailor. */
   GEMINI_MODEL?: string
   VITE_GEMINI_API_KEY?: string
   VITE_GEMINI_MODEL?: string
-  /** High-volume actions: parse JD, parse resume, cover letter (default: gemini-3.5-flash-lite). */
+  /** High-volume actions: parse JD, parse resume (default: gemini-3.5-flash-lite). Also the last tailor fallback. */
   GEMINI_MODEL_LITE?: string
-  /** Primary tailor model (default: gemini-3.6-flash). */
+  /**
+   * Optional comma-separated tailor chain. When unset, tailor tries
+   * gemini-3.8-flash, gemini-3.7-flash, gemini-3.6-flash, then GEMINI_MODEL_LITE.
+   */
+  GEMINI_MODEL_TAILOR_MODELS?: string
+  /** @deprecated Ignored. Tailor uses GEMINI_MODEL_TAILOR_MODELS or the built-in chain. */
   GEMINI_MODEL_TAILOR?: string
-  /** Tailor fallback when primary hits quota (default: gemini-3.5-flash). */
+  /** @deprecated Ignored. Tailor uses GEMINI_MODEL_TAILOR_MODELS or the built-in chain. */
   GEMINI_MODEL_TAILOR_FALLBACK?: string
 }
 
@@ -34,14 +39,19 @@ export function getGeminiLiteModel(env: ServerEnv): string {
   return env.GEMINI_MODEL_LITE || 'gemini-3.5-flash-lite'
 }
 
-/** Tailor CV — strongest model first. */
-export function getGeminiTailorModel(env: ServerEnv): string {
-  return env.GEMINI_MODEL_TAILOR || 'gemini-3.6-flash'
-}
+/** Resume + cover letter, strongest first. Flash Lite is appended as the last resort. */
+const DEFAULT_TAILOR_MODELS = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash']
 
-/** Tailor CV when primary is rate-limited. */
-export function getGeminiTailorFallbackModel(env: ServerEnv): string {
-  return env.GEMINI_MODEL_TAILOR_FALLBACK || 'gemini-3.5-flash'
+export function getGeminiTailorModels(env: ServerEnv): string[] {
+  const configured = env.GEMINI_MODEL_TAILOR_MODELS?.split(',')
+    .map((model) => model.trim())
+    .filter(Boolean)
+  const writers = configured?.length ? configured : DEFAULT_TAILOR_MODELS
+  const models: string[] = []
+  for (const model of [...writers, getGeminiLiteModel(env)]) {
+    if (!models.includes(model)) models.push(model)
+  }
+  return models
 }
 
 export function getAdzunaCredentials(env: ServerEnv): { appId: string; appKey: string } {
