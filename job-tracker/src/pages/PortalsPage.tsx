@@ -1,6 +1,5 @@
-import { useMemo, useState, type DragEvent } from 'react'
+import { useState, type DragEvent } from 'react'
 import { PageToolbar } from '../components/PageToolbar'
-import { ActivityHeatmap } from '../components/ActivityHeatmap'
 import { attachCardDragGhost } from '../components/JobCard'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { usePortalFeeds } from '../hooks/usePortalFeeds'
@@ -13,7 +12,6 @@ import {
   formSelectClass,
 } from '../lib/formUi'
 import { btnPrimaryClass } from '../lib/appUi'
-import { countCompleteDaysInYear } from '../lib/huntStreak'
 import {
   PORTAL_SOURCE_LABELS,
   PORTAL_SOURCE_OPTIONS,
@@ -27,10 +25,6 @@ export function PortalsPage() {
     loading,
     activeFeeds,
     todayCheckedIds,
-    todayComplete,
-    checkedTodayCount,
-    streak,
-    daysByDate,
     addFeed,
     updateFeed,
     deleteFeed,
@@ -52,12 +46,6 @@ export function PortalsPage() {
   const [error, setError] = useState<string | null>(null)
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
-
-  const activeIds = useMemo(() => activeFeeds.map((f) => f.id), [activeFeeds])
-  const yearComplete = useMemo(
-    () => countCompleteDaysInYear(daysByDate, activeFeeds, new Date().getFullYear()),
-    [daysByDate, activeFeeds]
-  )
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -171,37 +159,6 @@ export function PortalsPage() {
         }
       />
 
-      <section className="grid gap-4 sm:grid-cols-3">
-        <div
-          className={`rounded-xl border p-4 ${
-            todayComplete
-              ? 'border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30'
-              : 'border-slate-200 bg-white dark:border-track-700 dark:bg-track-800'
-          }`}
-        >
-          <p className="text-xs uppercase tracking-wide text-slate-400">Today</p>
-          <p className="mt-1 text-2xl font-bold">
-            {activeFeeds.length === 0
-              ? 'Add feeds'
-              : todayComplete
-                ? 'All checked ✓'
-                : `${checkedTodayCount}/${activeFeeds.length} checked`}
-          </p>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-track-700 dark:bg-track-800">
-          <p className="text-xs uppercase tracking-wide text-slate-400">Streak</p>
-          <p className="mt-1 text-2xl font-bold text-track-accent">
-            {streak} day{streak === 1 ? '' : 's'}
-          </p>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-track-700 dark:bg-track-800">
-          <p className="text-xs uppercase tracking-wide text-slate-400">
-            Complete days · {new Date().getFullYear()}
-          </p>
-          <p className="mt-1 text-2xl font-bold">{yearComplete}</p>
-        </div>
-      </section>
-
       {(message || error) && (
         <p
           className={`rounded-lg p-3 text-sm ${
@@ -213,34 +170,6 @@ export function PortalsPage() {
           {error || message}
         </p>
       )}
-
-      <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-track-700 dark:bg-track-800">
-        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-          <h2 className="font-semibold">Portal streak</h2>
-          <div className="flex flex-wrap gap-4 text-sm">
-            <div>
-              <p className="text-xs text-slate-400">Streak</p>
-              <p className="font-bold text-track-accent">
-                {streak} day{streak === 1 ? '' : 's'}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-slate-400">{new Date().getFullYear()}</p>
-              <p className="font-bold">{yearComplete} complete days</p>
-            </div>
-          </div>
-        </div>
-        {activeIds.length === 0 ? (
-          <p className="text-sm text-slate-500">No active feeds.</p>
-        ) : (
-          <ActivityHeatmap
-            variant="portal"
-            daysByDate={daysByDate}
-            activeFeeds={activeFeeds}
-            mode="year"
-          />
-        )}
-      </section>
 
       <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 dark:border-track-700 dark:bg-track-800">
         <h2 className="font-semibold">Your feeds</h2>
