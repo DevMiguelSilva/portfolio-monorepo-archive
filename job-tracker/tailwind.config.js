@@ -5,6 +5,17 @@ export default {
   theme: {
     extend: {
       colors: {
+        brand: {
+          ink: '#020907',
+          canvas: '#fafdfc',
+          primary: '#46caa6',
+          primaryDeep: '#2eae8c',
+          secondary: '#9bc3e2',
+          accent: '#637fd2',
+          muted: '#4d635c',
+          line: '#dce8e4',
+          mist: '#e7f4ef',
+        },
         surface: {
           50: '#f8fafc',
           100: '#f1f5f9',

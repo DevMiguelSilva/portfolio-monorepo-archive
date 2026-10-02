@@ -87,3 +87,126 @@
     @apply bg-gradient-to-r from-sky-600 to-cyan-600 bg-clip-text text-transparent;
   }
 }
+
+/* Inbox match cards: actions sit beside the role on a wide screen, and after the skills on a phone. */
+.inbox-job {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'facts actions'
+    'skills skills';
+  gap: 1rem;
+  align-items: start;
+}
+
+.inbox-job-facts {
+  grid-area: facts;
+}
+
+.inbox-job-actions {
+  grid-area: actions;
+}
+
+.inbox-job-skills {
+  grid-area: skills;
+}
+
+/* Saved searches: icons beside a centered drag handle on a wide screen. On a phone, Run and Edit only, with no drag handle. */
+.search-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.search-drag {
+  display: flex;
+}
+
+.search-icons {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.25rem;
+}
+
+.search-pair,
+.search-mobile-only {
+  display: none;
+}
+
+@media (max-width: 639px) {
+  .search-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .search-drag,
+  .search-icons {
+    display: none;
+  }
+
+  .search-pair,
+  .search-mobile-only {
+    display: grid;
+    width: 100%;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+}
+
+.search-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.search-field-wide {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 639px) {
+  .search-fields {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Phone action buttons sit in two equal columns. A lone button spans the row. */
+@media (max-width: 639px) {
+  .m-action-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+
+  .m-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    width: 100%;
+  }
+
+  .m-action {
+    box-sizing: border-box;
+    display: flex;
+    width: 100%;
+    min-height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    padding-left: 0.6rem;
+    padding-right: 0.6rem;
+    text-align: center;
+    white-space: normal;
+    line-height: 1.25;
+  }
+
+  .m-action:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
+  .inbox-job {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+}

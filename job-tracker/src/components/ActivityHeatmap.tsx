@@ -45,6 +45,7 @@ export function ActivityHeatmap(props: ActivityHeatmapProps) {
   const mode = props.mode ?? 'year'
   const weeks = props.weeks ?? 26
   const year = new Date().getFullYear()
+  const scrollRef = useRef<HTMLDivElement>(null)
   const todayWeekRef = useRef<HTMLDivElement>(null)
 
   const cells = useMemo(() => {
@@ -101,11 +102,19 @@ export function ActivityHeatmap(props: ActivityHeatmapProps) {
   }, [cells])
 
   useEffect(() => {
-    todayWeekRef.current?.scrollIntoView({
-      inline: 'center',
-      block: 'nearest',
-      behavior: 'instant',
-    })
+    const scroller = scrollRef.current
+    const target = todayWeekRef.current
+    if (!scroller || !target) return
+
+    const showToday = () => {
+      const scrollerRect = scroller.getBoundingClientRect()
+      const targetRect = target.getBoundingClientRect()
+      scroller.scrollLeft += targetRect.right - scrollerRect.right
+    }
+
+    showToday()
+    const frame = requestAnimationFrame(showToday)
+    return () => cancelAnimationFrame(frame)
   }, [todayWeekIndex, cells.length])
 
   return (
@@ -113,8 +122,8 @@ export function ActivityHeatmap(props: ActivityHeatmapProps) {
       {mode === 'year' && (
         <p className="text-xs font-medium text-slate-500">{year}</p>
       )}
-      <div className="app-scroll flex gap-2 overflow-x-auto pb-1">
-        <div className="flex flex-col justify-between py-1 text-[10px] text-slate-400">
+      <div ref={scrollRef} className="app-scroll flex gap-2 overflow-x-auto pb-1">
+        <div className="sticky left-0 z-10 flex flex-col justify-between bg-white py-1 pr-1 text-[10px] text-slate-400">
           {WEEKDAYS.map((d, i) => (
             <span key={d} className={i % 2 === 1 ? 'invisible' : ''}>
               {d}

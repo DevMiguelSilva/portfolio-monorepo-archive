@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { boardLook } from '../components/BoardLook'
 import { PageHero } from '../components/PageHero'
 import { ActivityHeatmap } from '../components/ActivityHeatmap'
-import { KanbanBoard } from '../components/KanbanBoard'
+import { KanbanBoard, type BoardColumn } from '../components/KanbanBoard'
 import {
   applicationsToday,
   buildApplyCountsByDate,
@@ -10,7 +11,7 @@ import {
   countApplyDaysInYear,
 } from '../lib/applyStreak'
 import { collectSearchHits } from '../lib/jobSearch'
-import { pageCardClass, pageCardHoverClass, btnPrimaryClass } from '../lib/appUi'
+import { BOARD_TONE } from '../lib/boardTone'
 import {
   INTERVIEW_FOLLOW_UP_LABEL,
   interviewBoardLine,
@@ -20,11 +21,28 @@ import {
   type JobApplication,
 } from '../types/job'
 import { useJobs } from '../hooks/useJobs'
+import { useTailoredDocs } from '../hooks/useTailoredDocs'
+
+type EndColumn = 'offer' | 'rejected' | 'trash'
+
+function useNarrowBoard() {
+  const [narrow, setNarrow] = useState(() => window.matchMedia('(max-width: 639px)').matches)
+
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 639px)')
+    const onChange = () => setNarrow(query.matches)
+    query.addEventListener('change', onChange)
+    return () => query.removeEventListener('change', onChange)
+  }, [])
+
+  return narrow
+}
 
 function hitColumnLabel(trashed: boolean, job: JobApplication): string {
   if (trashed) return 'Trash'
   const label = STATUS_CONFIG[job.status]?.label ?? job.status
   if (job.status === 'interview') {
+    if (job.notSelected) return `${label} · Not selected`
     const line = interviewBoardLine(job.interviews)
     const followUp = latestInterviewFollowUp(job.interviews)
     const followLabel = followUp ? INTERVIEW_FOLLOW_UP_LABEL[followUp] : null
@@ -34,9 +52,12 @@ function hitColumnLabel(trashed: boolean, job: JobApplication): string {
 }
 
 export function DashboardPage() {
-  const { jobs, activeJobs, trashedJobs, moveJob, restoreJob, purgeJob, loading } = useJobs()
-  const [showRejected, setShowRejected] = useState(false)
-  const [showTrash, setShowTrash] = useState(false)
+  const { jobs, activeJobs, trashedJobs, moveJob, restoreJob, purgeJob, emptyTrash, loading } =
+    useJobs()
+  const { getForJob } = useTailoredDocs()
+  const narrow = useNarrowBoard()
+  const [endColumn, setEndColumn] = useState<EndColumn>('offer')
+  const [mobileColumn, setMobileColumn] = useState<BoardColumn>('saved')
   const [boardSearch, setBoardSearch] = useState('')
 
   const searchHits = useMemo(
@@ -58,38 +79,41 @@ export function DashboardPage() {
     () => countApplyDaysInYear(applyCounts, new Date().getFullYear()),
     [applyCounts]
   )
+  const boardColumns: BoardColumn[] = narrow
+    ? [mobileColumn]
+    : ['saved', 'applied', 'interview', endColumn]
 
   return (
-    <div className="space-y-6">
+    <div className={boardLook.page}>
       <PageHero
         label="ApplyTrack"
         title={
           <>
-            Find · Tailor · <span className="gradient-text">Track</span>
+            Find · Tailor · <span className="text-brand-primary">Track</span>
           </>
         }
         description="Your job-search command center — inbox matches, Kanban pipeline, and AI tailoring in one place."
       />
 
-      <section className={`${pageCardClass} p-5 sm:p-6`}>
-        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-          <h2 className="font-display font-semibold text-slate-900">Application streak</h2>
+      <section className={`${boardLook.card} ${boardLook.cardPad}`}>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 className={boardLook.streakTitle}>Application streak</h2>
           <div className="flex flex-wrap gap-4 text-sm">
             <div>
-              <p className="text-xs text-slate-400">Streak</p>
-              <p className="font-bold text-sky-600">
+              <p className={boardLook.caption}>Streak</p>
+              <p className={boardLook.streakValue}>
                 {applyStreak} day{applyStreak === 1 ? '' : 's'}
               </p>
             </div>
             <div>
-              <p className="text-xs text-slate-400">Today</p>
-              <p className="font-bold">
+              <p className={boardLook.caption}>Today</p>
+              <p className={boardLook.streakQuiet}>
                 {appliedToday} {appliedToday === 1 ? 'apply' : 'applies'}
               </p>
             </div>
             <div>
-              <p className="text-xs text-slate-400">{new Date().getFullYear()}</p>
-              <p className="font-bold">{applyDaysYear} active days</p>
+              <p className={boardLook.caption}>{new Date().getFullYear()}</p>
+              <p className={boardLook.streakQuiet}>{applyDaysYear} active days</p>
             </div>
           </div>
         </div>
@@ -97,67 +121,36 @@ export function DashboardPage() {
       </section>
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        {stats.map(({ status, count }) => {
-          const isRejected = status === 'rejected'
-          const active = isRejected && showRejected
-          const className = `rounded-2xl border p-4 text-center transition ${pageCardHoverClass} ${
-            isRejected
-              ? `w-full ${
-                  active
-                    ? 'border-red-200 bg-red-50 ring-2 ring-red-100'
-                    : 'border-slate-200 bg-white hover:border-red-200'
-                }`
-              : `${pageCardClass} border-slate-200/80`
-          }`
-
-          if (isRejected) {
-            return (
-              <button
-                key={status}
-                type="button"
-                onClick={() => setShowRejected((v) => !v)}
-                className={className}
-                aria-pressed={showRejected}
-                title={showRejected ? 'Hide Rejected column' : 'Show Rejected column on the board'}
-              >
-                <p className="text-2xl font-bold text-sky-600">{count}</p>
-                <p className="text-xs capitalize text-slate-500">
-                  {STATUS_CONFIG[status].label}
-                  <span className="mt-0.5 block text-[10px] font-normal normal-case text-slate-400">
-                    {showRejected ? 'Click to hide column' : 'Click to show on board'}
-                  </span>
-                </p>
-              </button>
-            )
-          }
-
-          return (
-            <div key={status} className={className}>
-              <p className="text-2xl font-bold text-sky-600">{count}</p>
-              <p className="text-xs capitalize text-slate-500">{status}</p>
-            </div>
-          )
-        })}
-
-        <button
-          type="button"
-          onClick={() => setShowTrash((v) => !v)}
-          className={`rounded-2xl border p-4 text-center transition ${pageCardHoverClass} ${
-            showTrash
-              ? 'border-slate-300 bg-slate-50 ring-2 ring-slate-200'
-              : `${pageCardClass} border-slate-200/80 hover:border-slate-300`
-          }`}
-          aria-pressed={showTrash}
-          title={showTrash ? 'Hide Trash column' : 'Show Trash column on the board'}
-        >
-          <p className="text-2xl font-bold text-sky-600">{trashedJobs.length}</p>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Trash
-            <span className="mt-0.5 block text-[10px] font-normal normal-case text-slate-400">
-              {showTrash ? 'Click to hide column' : 'Click to show on board'}
-            </span>
-          </p>
-        </button>
+        {stats.map(({ status, count }) => (
+          <CountCard
+            key={status}
+            slot={status}
+            label={STATUS_CONFIG[status].label}
+            count={count}
+            narrow={narrow}
+            endColumn={endColumn}
+            mobileColumn={mobileColumn}
+            onDesktop={(slot) => {
+              if (slot === 'offer') setEndColumn('offer')
+              else if (slot === 'rejected' || slot === 'trash') {
+                setEndColumn((current) => (current === slot ? 'offer' : slot))
+              }
+            }}
+            onMobile={setMobileColumn}
+          />
+        ))}
+        <CountCard
+          slot="trash"
+          label="Trash"
+          count={trashedJobs.length}
+          narrow={narrow}
+          endColumn={endColumn}
+          mobileColumn={mobileColumn}
+          onDesktop={(slot) => {
+            if (slot === 'trash') setEndColumn((current) => (current === 'trash' ? 'offer' : 'trash'))
+          }}
+          onMobile={setMobileColumn}
+        />
       </section>
 
       <section>
@@ -167,7 +160,7 @@ export function DashboardPage() {
               Search applications
             </label>
             <svg
-              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-muted"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -186,14 +179,14 @@ export function DashboardPage() {
               value={boardSearch}
               onChange={(e) => setBoardSearch(e.target.value)}
               placeholder="Company, role, URL…"
-              className="w-full appearance-none rounded-full border border-slate-200 bg-white py-2.5 pl-9 pr-9 text-sm outline-none ring-sky-100 transition placeholder:text-slate-400 focus:border-sky-400 focus:ring-2"
+              className={boardLook.search}
               autoComplete="off"
             />
             {boardSearch && (
               <button
                 type="button"
                 onClick={() => setBoardSearch('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-brand-muted hover:bg-brand-mist hover:text-brand-ink"
                 aria-label="Clear search"
               >
                 <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
@@ -225,12 +218,12 @@ export function DashboardPage() {
               <Link
                 key={job.id}
                 to={`/job/${job.id}`}
-                className="inline-flex max-w-full items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-700 transition hover:border-sky-200 hover:bg-sky-50/50"
+                className="inline-flex max-w-full items-center gap-1.5 rounded-xl border border-brand-line bg-white px-2.5 py-1 text-xs text-brand-ink transition hover:border-brand-primary/50 hover:bg-brand-mist"
               >
                 <span className="truncate font-medium">
                   {job.company || 'Unknown'} · {job.role || 'Untitled'}
                 </span>
-                <span className="shrink-0 text-slate-400">
+                <span className="shrink-0 text-brand-muted">
                   {hitColumnLabel(trashed, job)}
                 </span>
               </Link>
@@ -239,12 +232,12 @@ export function DashboardPage() {
         )}
 
         {loading ? (
-          <p className="text-sm text-slate-500">Loading applications…</p>
+          <p className={boardLook.body}>Loading applications…</p>
         ) : activeJobs.length === 0 && trashedJobs.length === 0 ? (
-          <div className={`rounded-2xl border border-dashed border-slate-300 ${pageCardClass} p-12 text-center`}>
+          <div className={boardLook.empty}>
             <p className="text-4xl">📋</p>
-            <h3 className="mt-3 font-display font-semibold text-slate-900">No applications yet</h3>
-            <Link to="/add" className={`mt-4 inline-block ${btnPrimaryClass}`}>
+            <h3 className={boardLook.emptyTitle}>No applications yet</h3>
+            <Link to="/add" className={`mt-4 ${boardLook.button}`}>
               Add your first job
             </Link>
           </div>
@@ -252,17 +245,70 @@ export function DashboardPage() {
           <KanbanBoard
             jobs={activeJobs}
             searchQuery={boardSearch}
-            onMoveJob={moveJob}
-            showRejected={showRejected}
-            onHideRejected={() => setShowRejected(false)}
-            showTrash={showTrash}
+            onMoveJob={(id, status) => {
+              if (status === 'applied') {
+                const job = jobs.find((item) => item.id === id)
+                if (job?.status === 'saved' && !getForJob(id)?.tailoredCv) return
+              }
+              moveJob(id, status)
+            }}
+            columns={boardColumns}
             trashedJobs={trashedJobs}
-            onHideTrash={() => setShowTrash(false)}
             onRestoreJob={restoreJob}
             onPurgeJob={purgeJob}
+            onEmptyTrash={emptyTrash}
           />
         )}
       </section>
     </div>
+  )
+}
+
+function CountCard({
+  slot,
+  label,
+  count,
+  narrow,
+  endColumn,
+  mobileColumn,
+  onDesktop,
+  onMobile,
+}: {
+  slot: BoardColumn
+  label: string
+  count: number
+  narrow: boolean
+  endColumn: EndColumn
+  mobileColumn: BoardColumn
+  onDesktop: (slot: BoardColumn) => void
+  onMobile: (slot: BoardColumn) => void
+}) {
+  const selectable = narrow || slot === 'offer' || slot === 'rejected' || slot === 'trash'
+  const selected = narrow ? mobileColumn === slot : endColumn === slot && selectable
+  const className = `border p-4 text-center ${boardLook.cardHover} ${boardLook.card} ${
+    selected ? 'ring-2 ring-brand-primary/40' : ''
+  }`
+  const body = (
+    <>
+      <p className={`${boardLook.figure} ${BOARD_TONE[slot].figure}`}>{count}</p>
+      <p className={`mt-1 capitalize ${boardLook.caption}`}>{label}</p>
+    </>
+  )
+
+  if (!selectable) {
+    return <div className={className}>{body}</div>
+  }
+
+  const title =
+    slot === 'rejected' || slot === 'trash' || slot === 'offer'
+      ? selected
+        ? `Showing ${label}`
+        : `Show ${label} in the last column`
+      : `Show ${label}`
+
+  return (
+    <button type="button" onClick={() => (narrow ? onMobile(slot) : onDesktop(slot))} className={className} aria-pressed={selected} title={title}>
+      {body}
+    </button>
   )
 }

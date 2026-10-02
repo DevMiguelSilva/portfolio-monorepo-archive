@@ -7,7 +7,7 @@ export interface InterviewRound {
   id: string
   /** Local calendar day (YYYY-MM-DD). */
   date: string
-  /** Optional round name, such as "Screen" or "Technical". */
+  /** Round name, such as "Screen" or "Technical". Required. */
   label: string
   /** True after the call has happened. */
   done: boolean
@@ -49,11 +49,21 @@ export interface JobApplication {
   cvTrack: CvTrack | null
   /**
    * False when JD is an API listing preview/snippet (Adzuna, etc.).
-   * True after manual paste of the full posting (Add Job or Job Detail enrich).
+   * True after the full posting is parsed and scored.
    */
   jdComplete: boolean
+  /**
+   * True after an agent replaces the snippet with the full posting.
+   * Scoring still waits for a manual Rescore. Cleared once that runs.
+   */
+  needsRescore: boolean
   /** Soft-delete timestamp — set when moved to Trash; null when active on the board. */
   deletedAt: string | null
+  /**
+   * Interview reached a decision and the candidate was not selected.
+   * The job stays in Interview; it is not a rejection.
+   */
+  notSelected: boolean
   createdAt: string
   updatedAt: string
 }
@@ -267,7 +277,9 @@ export function createEmptyJob(overrides: Partial<JobApplication> = {}): JobAppl
     matchScore: null,
     cvTrack: null,
     jdComplete: true,
+    needsRescore: false,
     deletedAt: null,
+    notSelected: false,
     createdAt: now,
     updatedAt: now,
     ...overrides,

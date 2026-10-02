@@ -1,86 +1,61 @@
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 import type { JobApplication, JobStatus } from '../types/job'
-import { BOARD_STATUS_ORDER, STATUS_CONFIG, STATUS_ORDER } from '../types/job'
+import { STATUS_CONFIG } from '../types/job'
 import { filterJobsBySearch } from '../lib/jobSearch'
+import { boardLook } from './BoardLook'
 import { attachCardDragGhost, JobCard } from './JobCard'
 
-const COLUMN_HEADER_BG: Record<JobStatus, string> = {
-  saved: 'bg-slate-200',
-  applied: 'bg-sky-100',
-  interview: 'bg-amber-100',
-  offer: 'bg-emerald-100',
-  rejected: 'bg-red-100',
-}
-
-function ColumnHead({
-  title,
-  titleClass,
-  pillClass,
-  borderClass,
-  count,
-  extra,
-}: {
-  title: string
-  titleClass: string
-  pillClass: string
-  borderClass: string
-  count: number
-  extra?: ReactNode
-}) {
+function ColumnHead({ title, count }: { title: string; count: number }) {
   return (
     <div className="sticky top-0 z-10 isolate">
-      <div className="bg-slate-50 pt-3">
-        <div
-          className={`flex items-center justify-between rounded-xl border px-3 py-2.5 ${pillClass} ${borderClass}`}
-        >
-          <h2 className={`text-sm font-semibold ${titleClass}`}>{title}</h2>
-          <div className="flex items-center gap-2">
-            <span className="rounded-full bg-white/80 px-2 py-0.5 text-xs font-bold">{count}</span>
-            {extra}
-          </div>
+      <div className="bg-[#f7fbf9] px-1 pb-1 pt-4">
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="font-display text-base font-semibold tracking-tight text-brand-ink">{title}</h2>
+          <span className="font-sans text-sm font-medium tabular-nums text-brand-muted">{count}</span>
         </div>
       </div>
       <div
-        className="pointer-events-none h-5 bg-gradient-to-b from-slate-50 to-transparent"
+        className="pointer-events-none h-4 bg-gradient-to-b from-[#f7fbf9] to-transparent"
         aria-hidden
       />
     </div>
   )
 }
 
+export type BoardColumn = JobStatus | 'trash'
+
 interface KanbanBoardProps {
   jobs: JobApplication[]
   onMoveJob: (id: string, status: JobStatus) => void
   /** Filter cards across all columns (company, role, URL, external id). */
   searchQuery?: string
-  /** When false, Rejected column is hidden (jobs still tracked). */
-  showRejected?: boolean
-  onHideRejected?: () => void
-  showTrash?: boolean
+  /** Columns to show, in order. Rejected and trash replace offer instead of adding a new column. */
+  columns?: BoardColumn[]
   trashedJobs?: JobApplication[]
-  onHideTrash?: () => void
   onRestoreJob?: (id: string) => void
   onPurgeJob?: (id: string) => void
+  onEmptyTrash?: () => void
 }
 
 export function KanbanBoard({
   jobs,
   onMoveJob,
   searchQuery = '',
-  showRejected = false,
-  onHideRejected,
-  showTrash = false,
+  columns = ['saved', 'applied', 'interview', 'offer'],
   trashedJobs = [],
-  onHideTrash,
   onRestoreJob,
   onPurgeJob,
+  onEmptyTrash,
 }: KanbanBoardProps) {
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [dropTarget, setDropTarget] = useState<JobStatus | null>(null)
-  const columns = showRejected ? STATUS_ORDER : BOARD_STATUS_ORDER
+  const single = columns.length === 1
   const visibleJobs = filterJobsBySearch(jobs, searchQuery)
   const searching = searchQuery.trim().length > 0
   const visibleTrash = filterJobsBySearch(trashedJobs, searchQuery)
+  const listTop = 'mt-1'
+  const rowClass = single ? 'flex' : 'grid grid-cols-4 gap-3'
+  const colClass = single ? 'w-full min-w-0' : 'min-w-0'
 
   const handleDrop = (status: JobStatus) => {
     if (draggedId) {
@@ -91,17 +66,67 @@ export function KanbanBoard({
   }
 
   return (
-    <div className="app-scroll max-h-[40rem] overflow-auto rounded-2xl border border-slate-200/80 bg-slate-50 px-3 pb-3 shadow-sm">
-      <div className="flex min-w-min gap-4">
-        {columns.map((status) => {
+    <div className={boardLook.kanban}>
+      <div className={rowClass}>
+        {columns.map((column) => {
+          if (column === 'trash') {
+            return (
+              <div key="trash" className={colClass}>
+                <ColumnHead title="Trash" count={visibleTrash.length} />
+                <div className={`${listTop} min-h-[7rem] space-y-2`}>
+                  {trashedJobs.length > 0 && onEmptyTrash && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const count = trashedJobs.length
+                        const label = count === 1 ? '1 job' : `${count} jobs`
+                        if (
+                          confirm(
+                            `Permanently delete ${label} in trash? This cannot be undone.`
+                          )
+                        ) {
+                          onEmptyTrash()
+                        }
+                      }}
+                      className="w-full rounded-lg border border-[#e6eeeb] bg-white px-3 py-2 text-xs font-semibold text-brand-ink transition hover:border-red-200 hover:text-red-700"
+                    >
+                      Empty trash
+                    </button>
+                  )}
+                  {visibleTrash.length === 0 ? (
+                    <p className="rounded-lg border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400 dark:border-track-700">
+                      {searching ? 'No matches in trash' : 'No deleted jobs'}
+                    </p>
+                  ) : (
+                    visibleTrash.map((job) => (
+                      <JobCard
+                        key={job.id}
+                        job={job}
+                        trashMode
+                        onRestore={onRestoreJob}
+                        onPurge={onPurgeJob}
+                      />
+                    ))
+                  )}
+                </div>
+              </div>
+            )
+          }
+
+          const status = column
           const config = STATUS_CONFIG[status]
-          const columnJobs = visibleJobs.filter((job) => job.status === status)
+          const columnJobs = visibleJobs
+            .filter((job) => job.status === status)
+            .sort((a, b) => {
+              if (status !== 'interview') return 0
+              return Number(a.notSelected) - Number(b.notSelected)
+            })
           const isTarget = dropTarget === status && draggedId != null
 
           return (
             <div
               key={status}
-              className="min-w-[260px] flex-1"
+              className={colClass}
               onDragOver={(e) => {
                 e.preventDefault()
                 e.dataTransfer.dropEffect = 'move'
@@ -112,27 +137,10 @@ export function KanbanBoard({
               }}
               onDrop={() => handleDrop(status)}
             >
-              <ColumnHead
-                title={config.label}
-                titleClass={config.color}
-                pillClass={COLUMN_HEADER_BG[status]}
-                borderClass={config.border}
-                count={columnJobs.length}
-                extra={
-                  status === 'rejected' && onHideRejected ? (
-                    <button
-                      type="button"
-                      onClick={onHideRejected}
-                      className="text-xs font-medium text-red-600/80 hover:underline"
-                    >
-                      Hide
-                    </button>
-                  ) : null
-                }
-              />
+              <ColumnHead title={config.label} count={columnJobs.length} />
               <div
-                className={`-mt-2 min-h-[7rem] space-y-2 rounded-lg transition ${
-                  isTarget ? 'bg-track-accent/5 ring-2 ring-inset ring-track-accent/30' : ''
+                className={`${listTop} min-h-[7rem] space-y-2 rounded-lg transition ${
+                  isTarget ? 'bg-brand-primary/10 ring-2 ring-inset ring-brand-primary/40' : ''
                 }`}
               >
                 {columnJobs.length === 0 ? (
@@ -160,46 +168,6 @@ export function KanbanBoard({
             </div>
           )
         })}
-
-        {showTrash && (
-          <div className="min-w-[260px] flex-1">
-            <ColumnHead
-              title="Trash"
-              titleClass="text-slate-600"
-              pillClass="bg-slate-200"
-              borderClass="border-slate-300"
-              count={visibleTrash.length}
-              extra={
-                onHideTrash ? (
-                  <button
-                    type="button"
-                    onClick={onHideTrash}
-                    className="text-xs font-medium text-slate-500 hover:underline"
-                  >
-                    Hide
-                  </button>
-                ) : null
-              }
-            />
-            <div className="-mt-2 min-h-[7rem] space-y-2">
-              {visibleTrash.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400 dark:border-track-700">
-                  {searching ? 'No matches in trash' : 'No deleted jobs'}
-                </p>
-              ) : (
-                visibleTrash.map((job) => (
-                  <JobCard
-                    key={job.id}
-                    job={job}
-                    trashMode
-                    onRestore={onRestoreJob}
-                    onPurge={onPurgeJob}
-                  />
-                ))
-              )}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )

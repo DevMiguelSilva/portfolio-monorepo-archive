@@ -88,6 +88,8 @@ alter table job_applications drop constraint if exists job_applications_intervie
 alter table job_applications add constraint job_applications_interview_stage_check
   check (interview_stage is null or interview_stage in ('preparing', 'waiting'));
 alter table job_applications add column if not exists interviews jsonb not null default '[]'::jsonb;
+alter table job_applications add column if not exists not_selected boolean not null default false;
+alter table job_applications add column if not exists needs_rescore boolean not null default false;
 alter table job_inbox add column if not exists matched_track text;
 
 create table if not exists job_inbox (

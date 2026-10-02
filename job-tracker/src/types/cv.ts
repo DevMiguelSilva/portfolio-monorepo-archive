@@ -125,12 +125,22 @@ export interface MasterCvLibrary {
   updatedAt: string
 }
 
+/** have = already on the master CV. added = checked for this job. missing = not included. */
+export type GapSkillState = 'have' | 'added' | 'missing'
+
+export interface GapSkill {
+  skill: string
+  state: GapSkillState
+}
+
 export interface GapReport {
   coveragePercent: number
   matchedKeywords: string[]
-  /** Missing on Master CV but user confirmed for this job (shown blue). */
+  /** Missing on Master CV but user confirmed for this job. */
   claimedKeywords: string[]
   missingKeywords: string[]
+  /** JD order. Claiming a skill changes `state` only, never the position. */
+  skills: GapSkill[]
   suggestions: string[]
 }
 
@@ -440,5 +450,6 @@ export const EMPTY_GAP_REPORT: GapReport = {
   matchedKeywords: [],
   claimedKeywords: [],
   missingKeywords: [],
+  skills: [],
   suggestions: [],
 }

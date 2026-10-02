@@ -13,6 +13,11 @@ export interface ServerEnv {
    * gemini-3.8-flash, gemini-3.7-flash, gemini-3.6-flash, then GEMINI_MODEL_LITE.
    */
   GEMINI_MODEL_TAILOR_MODELS?: string
+  /**
+   * Optional comma-separated skill-definition chain. When unset: gemini-3.1-flash-lite,
+   * then gemini-3.1-flash-lite-preview. Kept off the tailor chain.
+   */
+  GEMINI_MODEL_EXPLAIN_MODELS?: string
   /** @deprecated Ignored. Tailor uses GEMINI_MODEL_TAILOR_MODELS or the built-in chain. */
   GEMINI_MODEL_TAILOR?: string
   /** @deprecated Ignored. Tailor uses GEMINI_MODEL_TAILOR_MODELS or the built-in chain. */
@@ -39,8 +44,25 @@ export function getGeminiLiteModel(env: ServerEnv): string {
   return env.GEMINI_MODEL_LITE || 'gemini-3.5-flash-lite'
 }
 
+/**
+ * Short definitions. High daily quota, and none of these are on the tailor chain.
+ * 3.1 Flash-Lite is about 500 requests/day; the preview is a separate quota.
+ */
+const DEFAULT_EXPLAIN_MODELS = ['gemini-3.1-flash-lite', 'gemini-3.1-flash-lite-preview']
+
 /** Resume + cover letter, strongest first. Flash Lite is appended as the last resort. */
 const DEFAULT_TAILOR_MODELS = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash']
+
+export function getGeminiExplainModels(env: ServerEnv): string[] {
+  const configured = env.GEMINI_MODEL_EXPLAIN_MODELS?.split(',')
+    .map((model) => model.trim())
+    .filter(Boolean)
+  const models: string[] = []
+  for (const model of configured?.length ? configured : DEFAULT_EXPLAIN_MODELS) {
+    if (!models.includes(model)) models.push(model)
+  }
+  return models
+}
 
 export function getGeminiTailorModels(env: ServerEnv): string[] {
   const configured = env.GEMINI_MODEL_TAILOR_MODELS?.split(',')
@@ -48,7 +70,7 @@ export function getGeminiTailorModels(env: ServerEnv): string[] {
     .filter(Boolean)
   const writers = configured?.length ? configured : DEFAULT_TAILOR_MODELS
   const models: string[] = []
-  for (const model of [...writers, getGeminiLiteModel(env)]) {
+  for (const model of [...writers, getGeminiLiteModel(env), 'gemini-3.1-flash-lite']) {
     if (!models.includes(model)) models.push(model)
   }
   return models

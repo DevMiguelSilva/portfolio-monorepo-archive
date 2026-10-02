@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react'
-import { tailorMasterCv } from '../api/gemini'
+import { Fragment, useMemo, useRef, useState } from 'react'
+import { explainSkill, tailorMasterCv } from '../api/gemini'
 import { downloadApplicationPack, openCvPrintWindow } from '../lib/docxExport'
 import { buildGapReport } from '../lib/matchScore'
 import { suggestTransferableSkills, transferCheck, transferDifficultyClass, transferDifficultyLabel } from '../lib/skillTransfer'
-import type { GapReport, MasterCv, TailoredDocument } from '../types/cv'
+import type { GapReport, GapSkill, MasterCv, TailoredDocument } from '../types/cv'
 import {
   CV_TRACK_LABELS,
   EMPTY_GAP_REPORT,
@@ -33,19 +33,79 @@ function hasGapContent(gap: GapReport): boolean {
   )
 }
 
+const quietBtn =
+  'rounded-lg border border-[#e6eeeb] bg-white px-4 py-2 text-sm font-semibold text-brand-ink transition hover:bg-[#f4faf8] disabled:opacity-60'
+const pasteBtn =
+  'rounded-lg border border-[#e6eeeb] bg-white px-4 py-2 text-sm font-semibold text-brand-ink transition hover:border-brand-primary hover:bg-brand-mist disabled:opacity-60'
+const quietOn =
+  'rounded-lg border border-brand-primary bg-brand-mist px-4 py-2 text-sm font-semibold text-brand-ink disabled:opacity-60'
+const nested = 'rounded-[1.25rem] border border-[#e6eeeb] bg-[#fafdfc] p-4 sm:p-5'
+
 function panelButtonClass(active: boolean, primary = false): string {
-  if (primary) {
-    return active
-      ? 'rounded-lg bg-emerald-800 px-3 py-2 text-sm font-medium text-white ring-2 ring-emerald-400/60'
-      : 'rounded-lg bg-emerald-700 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-800 disabled:opacity-50'
-  }
-  return active
-    ? 'rounded-lg border border-emerald-500 bg-emerald-100/80 px-3 py-2 text-sm font-medium text-emerald-900 dark:border-emerald-400 dark:bg-emerald-950/50 dark:text-emerald-200'
-    : 'rounded-lg border border-emerald-700 px-3 py-2 text-sm font-medium text-emerald-800 dark:text-emerald-300 disabled:opacity-50'
+  if (active) return quietOn
+  return primary ? pasteBtn : quietBtn
 }
 
 function skillKey(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+const skillLink =
+  'text-left font-medium underline-offset-4 transition hover:underline'
+
+const chipHave = 'rounded-lg bg-[#f4faf8] px-2.5 py-1 text-sm text-brand-ink'
+const chipAdded = 'rounded-lg border border-brand-primary bg-brand-mist px-2.5 py-1 text-sm text-brand-ink'
+const chipMissing = 'rounded-lg bg-[#faf6ef] px-2.5 py-1 text-sm text-[#8a6230]'
+
+function chipClass(state: GapSkill['state']): string {
+  if (state === 'have') return chipHave
+  if (state === 'added') return chipAdded
+  return chipMissing
+}
+
+function SkillName({
+  skill,
+  active,
+  added,
+  onClick,
+}: {
+  skill: string
+  active: boolean
+  added?: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      aria-expanded={active}
+      onClick={onClick}
+      className={`${skillLink} text-brand-ink hover:text-brand-primaryDeep ${active || added ? 'underline' : ''}`}
+    >
+      {skill}
+    </button>
+  )
+}
+
+function SkillAnswer({
+  loading,
+  error,
+  summary,
+}: {
+  loading: boolean
+  error: string | null
+  summary: string | null
+}) {
+  return (
+    <div className="mt-2 text-sm leading-relaxed text-brand-ink">
+      {loading && <p className="text-brand-muted">Looking it up…</p>}
+      {error && (
+        <p className="text-red-700" role="alert">
+          {error}
+        </p>
+      )}
+      {summary && !loading && <p>{summary}</p>}
+    </div>
+  )
 }
 
 export function TailorPanel({ job }: TailorPanelProps) {
@@ -71,9 +131,9 @@ export function TailorPanel({ job }: TailorPanelProps) {
   const [liteDraft, setLiteDraft] = useState(false)
 
   const claimedSkills = job.claimedSkills ?? []
+  const skillsLocked = job.status !== 'saved' || Boolean(job.deletedAt)
   const showGap = openPanels.has('gap')
   const showTailor = openPanels.has('tailor')
-  const showCover = openPanels.has('cover')
 
   const setPanelOpen = (id: PanelId, open: boolean) => {
     setOpenPanels((prev) => {
@@ -86,7 +146,7 @@ export function TailorPanel({ job }: TailorPanelProps) {
 
   const computeGap = (claimed: string[]) =>
     buildGapReport(
-      job.jobDescription,
+      `${job.role}\n${job.jobDescription}`,
       job.extractedSkills,
       masterCvSearchText(masterCv),
       claimed
@@ -130,6 +190,7 @@ export function TailorPanel({ job }: TailorPanelProps) {
     })
 
   const toggleClaimedSkill = async (skill: string) => {
+    if (skillsLocked) return
     const key = skillKey(skill)
     const nextClaimed = claimedSkills.some((s) => skillKey(s) === key)
       ? claimedSkills.filter((s) => skillKey(s) !== key)
@@ -150,6 +211,7 @@ export function TailorPanel({ job }: TailorPanelProps) {
 
   const runTailor = () =>
     run('tailor', async () => {
+      if (skillsLocked && tailoredCv) return
       if (!masterCv.contact.name.trim() && !masterCv.summary.trim()) {
         throw new Error('Fill in your Master CV first')
       }
@@ -182,14 +244,59 @@ export function TailorPanel({ job }: TailorPanelProps) {
       await persist(next, letter, gap)
     })
 
-  /** Toggle open/closed when result exists; first click runs generation. */
+  /** Fresh check on open, so an older saved report cannot hide languages or role requirements. */
   const onGapClick = () => {
     if (loading) return
-    if (!hasGapContent(gapReport)) {
-      void runGap()
+    if (showGap) {
+      setPanelOpen('gap', false)
       return
     }
-    setPanelOpen('gap', !showGap)
+    void runGap()
+  }
+
+  const explainCache = useRef(new Map<string, string>())
+  const explainRequest = useRef(0)
+  const [explainSkillName, setExplainSkillName] = useState<string | null>(null)
+  const [explainLoading, setExplainLoading] = useState(false)
+  const [explainError, setExplainError] = useState<string | null>(null)
+  const [explanation, setExplanation] = useState<string | null>(null)
+
+  const closeExplanation = () => {
+    explainRequest.current += 1
+    setExplainSkillName(null)
+    setExplainLoading(false)
+    setExplainError(null)
+  }
+
+  const lookupSkill = async (skill: string) => {
+    if (explainSkillName === skill) {
+      closeExplanation()
+      return
+    }
+    const request = ++explainRequest.current
+    setExplainSkillName(skill)
+    setExplainError(null)
+    const cached = explainCache.current.get(skill)
+    if (cached) {
+      setExplanation(cached)
+      setExplainLoading(false)
+      return
+    }
+    setExplanation(null)
+    setExplainLoading(true)
+    try {
+      const result = (await explainSkill(skill)).trim()
+      if (request !== explainRequest.current) return
+      if (!result) throw new Error('No explanation came back')
+      explainCache.current.set(skill, result)
+      setExplanation(result)
+    } catch (err) {
+      if (request !== explainRequest.current) return
+      setExplanation(null)
+      setExplainError(err instanceof Error ? err.message : 'Could not look that up')
+    } finally {
+      if (request === explainRequest.current) setExplainLoading(false)
+    }
   }
 
   const onTailorClick = () => {
@@ -198,16 +305,14 @@ export function TailorPanel({ job }: TailorPanelProps) {
       void runTailor()
       return
     }
-    setPanelOpen('tailor', !showTailor)
+    const open = !showTailor
+    setPanelOpen('tailor', open)
+    setPanelOpen('cover', open)
   }
 
-  const onCoverClick = () => {
-    if (loading) return
-    if (!coverLetter.trim()) {
-      setError('Tailor the resume first — cover letter is created with it.')
-      return
-    }
-    setPanelOpen('cover', !showCover)
+  const hidePack = () => {
+    setPanelOpen('tailor', false)
+    setPanelOpen('cover', false)
   }
 
   const handlePrint = () =>
@@ -228,197 +333,277 @@ export function TailorPanel({ job }: TailorPanelProps) {
     })
 
   const claimedKeywords = gapReport.claimedKeywords ?? []
+  const gapSkills = useMemo<GapSkill[]>(() => {
+    if (gapReport.skills?.length) return gapReport.skills
+    return [
+      ...gapReport.matchedKeywords.map((skill) => ({ skill, state: 'have' as const })),
+      ...claimedKeywords.map((skill) => ({ skill, state: 'added' as const })),
+      ...gapReport.missingKeywords.map((skill) => ({ skill, state: 'missing' as const })),
+    ]
+  }, [gapReport, claimedKeywords])
+  const displaySkills = useMemo(
+    () => [
+      ...gapSkills.filter((item) => item.state === 'have'),
+      ...gapSkills.filter((item) => item.state !== 'have'),
+    ],
+    [gapSkills]
+  )
+  const addedKeys = useMemo(
+    () => new Set(gapSkills.filter((item) => item.state === 'added').map((item) => skillKey(item.skill))),
+    [gapSkills]
+  )
   const transferSuggestions = useMemo(
     () =>
-      suggestTransferableSkills(gapReport.missingKeywords, [
-        ...masterCvSkillList(masterCv),
-        ...gapReport.matchedKeywords,
-      ]),
-    [gapReport.missingKeywords, gapReport.matchedKeywords, masterCv]
+      suggestTransferableSkills(
+        gapSkills.filter((item) => item.state !== 'have').map((item) => item.skill),
+        [...masterCvSkillList(masterCv), ...gapReport.matchedKeywords]
+      ),
+    [gapSkills, gapReport.matchedKeywords, masterCv]
   )
 
-  return (
-    <div className="space-y-4 rounded-xl border border-emerald-200 bg-emerald-50/40 p-5 dark:border-emerald-900 dark:bg-emerald-950/20">
-      <div>
-        <h2 className="text-lg font-bold">ATS tailor & export</h2>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          Using{' '}
-          <span className="font-medium text-slate-700 dark:text-slate-200">
-            {CV_TRACK_LABELS[track]}
-          </span>{' '}
-          master CV. Tailor creates the resume and cover letter together. Click a result button
-          again to hide it; Re-run on the tailored preview updates both.
-        </p>
-      </div>
+  const baseFor = (row: (typeof transferSuggestions)[number]) => {
+    if (row.relatedOwned.length === 0) return row.baseLabel ?? 'Nothing close on your CV.'
+    const names = row.relatedOwned.slice(0, 3)
+    const listed =
+      names.length === 1
+        ? names[0]
+        : names.length === 2
+          ? `${names[0]} and ${names[1]}`
+          : `${names[0]}, ${names[1]}, and ${names[2]}`
+    return `You already use ${listed}.`
+  }
 
-      <div className="flex flex-wrap gap-2">
+  const claimFor = (row: (typeof transferSuggestions)[number]) => {
+    if (addedKeys.has(skillKey(row.skill))) {
+      return skillsLocked ? (
+        <span className="text-sm font-medium text-brand-ink">Added</span>
+      ) : (
         <button
           type="button"
           disabled={!!loading}
+          onClick={() => void toggleClaimedSkill(row.skill)}
+          title="Click to remove it from this resume"
+          className="text-sm font-medium text-brand-ink underline-offset-4 transition hover:text-brand-primaryDeep hover:underline disabled:opacity-60"
+        >
+          Added
+        </button>
+      )
+    }
+    return row.checkIt ? (
+      skillsLocked ? (
+        <span className="text-sm font-medium text-brand-ink">
+          {transferCheck(row.difficulty) === 'yes' ? 'Yes' : 'Probably'}
+        </span>
+      ) : (
+        <button
+          type="button"
+          disabled={!!loading}
+          onClick={() => void toggleClaimedSkill(row.skill)}
+          className="text-sm font-medium text-brand-ink underline-offset-4 transition hover:text-brand-primaryDeep hover:underline disabled:opacity-60"
+        >
+          {transferCheck(row.difficulty) === 'yes' ? 'Yes' : 'Probably'}
+        </button>
+      )
+    ) : (
+      <span
+        className={
+          row.difficulty === 'hard'
+            ? 'text-sm font-medium text-orange-700'
+            : 'text-sm font-medium text-red-700'
+        }
+      >
+        {transferCheck(row.difficulty) === 'unlikely' ? 'Unlikely' : 'No'}
+      </span>
+    )
+  }
+
+  return (
+    <div className="space-y-4 rounded-[1.25rem] border border-[#e6eeeb] bg-white p-4 sm:p-6">
+      <div>
+        <h2 className="font-display text-base font-semibold text-brand-ink">ATS tailor & export</h2>
+        <p className="mt-1 text-sm text-brand-muted">
+          Using <span className="text-brand-ink">{CV_TRACK_LABELS[track]}</span> master CV. One
+          button writes the resume and the cover letter. Click it again to show or hide both.
+          {skillsLocked
+            ? ' Skill claims stay as they were when you applied.'
+            : ' Re-run updates both.'}
+        </p>
+      </div>
+
+      <div className="m-actions flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        <button
+          type="button"
+          data-role="quiet"
+          disabled={!!loading}
           onClick={onGapClick}
-          className={panelButtonClass(showGap)}
+          className={`${panelButtonClass(showGap)} m-action w-full sm:w-auto`}
         >
           {loading === 'gap' ? 'Checking…' : 'Gap check'}
         </button>
         <button
           type="button"
+          data-role="primary"
           disabled={!!loading}
           onClick={onTailorClick}
-          className={panelButtonClass(showTailor, true)}
+          className={`${panelButtonClass(showTailor, true)} m-action w-full sm:w-auto`}
         >
-          {loading === 'tailor' ? 'Tailoring…' : 'Tailor resume + cover letter'}
-        </button>
-        <button
-          type="button"
-          disabled={!!loading || !coverLetter.trim()}
-          onClick={onCoverClick}
-          className={panelButtonClass(showCover)}
-          title={
-            coverLetter.trim()
-              ? 'Show or hide the cover letter from tailor'
-              : 'Created automatically when you tailor'
-          }
-        >
-          Cover letter
+          {loading === 'tailor' ? 'Tailoring…' : tailoredCv ? (showTailor ? 'Hide files' : 'See files') : 'Tailor'}
         </button>
       </div>
 
       {loading && <LoadingSpinner label="Working…" />}
       {error && (
-        <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-300">
+        <p className="text-sm text-red-700" role="alert">
           {error}
         </p>
       )}
       {liteDraft && !error && (
-        <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+        <p className="text-sm text-[#8a6230]">
           Draft written with the lighter model because the main models were busy. Tailor again in a
           minute for a stronger version.
         </p>
       )}
 
       {showGap && hasGapContent(gapReport) && (
-        <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-track-700 dark:bg-track-800">
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <h3 className="font-semibold">Keyword coverage: {gapReport.coveragePercent}%</h3>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                disabled={!!loading}
-                className="text-xs font-medium text-track-accent hover:underline disabled:opacity-50"
-                onClick={() => void runGap()}
-              >
-                Re-run
-              </button>
-              <button
-                type="button"
-                className="text-xs text-slate-500 hover:underline"
-                onClick={() => setPanelOpen('gap', false)}
-              >
-                Close
-              </button>
-            </div>
+        <div className={nested}>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm text-brand-muted">
+              Keyword coverage: {gapReport.coveragePercent}%
+            </h3>
+            <button type="button" className={quietBtn} onClick={() => setPanelOpen('gap', false)}>
+              Close
+            </button>
           </div>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {gapReport.matchedKeywords.map((k) => (
-              <span
-                key={`m-${k}`}
-                className="rounded-md bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
-              >
-                {k}
-              </span>
-            ))}
-            {claimedKeywords.map((k) => (
-              <button
-                key={`c-${k}`}
-                type="button"
-                disabled={!!loading}
-                onClick={() => void toggleClaimedSkill(k)}
-                title="Click to unconfirm"
-                className="rounded-md bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-900 ring-1 ring-sky-300/80 dark:bg-sky-950/50 dark:text-sky-200 dark:ring-sky-700 disabled:opacity-50"
-              >
-                {k}
-              </button>
-            ))}
-            {gapReport.missingKeywords.map((k) => (
-              <button
-                key={`x-${k}`}
-                type="button"
-                disabled={!!loading}
-                onClick={() => void toggleClaimedSkill(k)}
-                title="Click if you know this skill"
-                className="rounded-md bg-amber-100 px-2 py-0.5 text-xs text-amber-800 ring-1 ring-transparent hover:ring-amber-400 dark:bg-amber-950/40 dark:text-amber-300 disabled:opacity-50"
-              >
-                {k}
-              </button>
-            ))}
+          <div className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-brand-muted">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-sm bg-[#f4faf8] ring-1 ring-[#dce8e4]" />
+              On your CV
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-sm border border-brand-primary bg-brand-mist" />
+              Added
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-sm bg-[#faf6ef] ring-1 ring-[#e6d3b8]" />
+              Not on this CV
+            </span>
           </div>
-          <ul className="mt-3 space-y-1 text-sm text-slate-600 dark:text-slate-300">
-            {gapReport.suggestions.map((s) => (
-              <li key={s}>• {s}</li>
+          <div className="flex flex-wrap gap-2">
+            {displaySkills.map((item) => {
+              const className = `${chipClass(item.state)} disabled:opacity-60`
+              if (item.state === 'have' || skillsLocked) {
+                return (
+                  <span key={item.skill} className={className}>
+                    {item.skill}
+                  </span>
+                )
+              }
+              return (
+                <button
+                  key={item.skill}
+                  type="button"
+                  disabled={!!loading}
+                  onClick={() => void toggleClaimedSkill(item.skill)}
+                  title={item.state === 'added' ? 'Click to remove it from this resume' : 'Click if you know this skill'}
+                  className={className}
+                >
+                  {item.skill}
+                </button>
+              )
+            })}
+          </div>
+          <ul className="mt-3 space-y-1 text-sm text-brand-ink">
+            {gapReport.suggestions
+              .filter((s) => !(skillsLocked && s.startsWith('Warm chips')))
+              .map((s) => (
+              <li key={s} className="flex gap-2">
+                <span className="text-brand-muted">•</span>
+                {s}
+              </li>
             ))}
           </ul>
           {transferSuggestions.length > 0 && (
-            <div className="mt-4 border-t border-slate-100 pt-3 dark:border-track-700">
-              <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                Missing vs your CV
-              </h4>
-              <p className="mt-1 text-xs text-slate-500">
-                Every amber skill is scored two ways — a hop from your CV, and how hard it is from
-                zero. The easier one wins. Word, Jira, and similar tools are never a big gap just
-                because they are not listed. Hard and big gap are for real stacks that take serious
-                study.
+            <div className="mt-4 border-t border-[#e6eeeb] pt-4">
+              <h4 className="text-sm font-medium text-brand-ink">Compared with your CV</h4>
+              <p className="mt-1 hidden text-sm text-brand-muted sm:block">
+                How hard it is to become proficient, based on what is already on your CV. A check
+                stays in this list.
               </p>
-              <div className="mt-3 overflow-x-auto">
-                <table className="min-w-[28rem] w-full text-left text-sm">
-                  <thead className="text-xs uppercase tracking-wide text-slate-400">
+              <ul className="mt-2 divide-y divide-[#e6eeeb] sm:hidden">
+                {transferSuggestions.map((row) => (
+                  <li key={row.skill} className="py-3">
+                    <SkillName
+                      skill={row.skill}
+                      added={addedKeys.has(skillKey(row.skill))}
+                      active={explainSkillName === row.skill}
+                      onClick={() => void lookupSkill(row.skill)}
+                    />
+                    <p className="mt-1 text-sm">
+                      <span className={transferDifficultyClass(row.difficulty)}>
+                        {transferDifficultyLabel(row.difficulty)}
+                      </span>
+                      <span className="text-brand-muted"> · </span>
+                      {claimFor(row)}
+                    </p>
+                    <p className="mt-0.5 text-sm text-brand-muted">{baseFor(row)}</p>
+                    {explainSkillName === row.skill && (
+                      <SkillAnswer
+                        loading={explainLoading}
+                        error={explainError}
+                        summary={explanation}
+                      />
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-3 hidden sm:block">
+                <table className="w-full table-fixed text-left text-sm">
+                  <colgroup>
+                    <col className="w-[24%]" />
+                    <col className="w-[42%]" />
+                    <col className="w-[16%]" />
+                    <col className="w-[18%]" />
+                  </colgroup>
+                  <thead className="text-xs text-brand-muted">
                     <tr>
-                      <th className="pb-2 pr-3 font-medium">Missing skill</th>
+                      <th className="pb-2 pr-3 font-medium">Skill</th>
                       <th className="pb-2 pr-3 font-medium">Your base</th>
                       <th className="pb-2 pr-3 font-medium">From zero</th>
-                      <th className="pb-2 font-medium">Check it?</th>
+                      <th className="w-[7.5rem] pb-2 font-medium">Claim?</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-track-700">
+                  <tbody className="divide-y divide-[#e6eeeb]">
                     {transferSuggestions.map((row) => (
-                      <tr key={row.skill}>
-                        <td className="py-2 pr-3 font-medium text-slate-800 dark:text-slate-100">
-                          {row.skill}
-                        </td>
-                        <td className="py-2 pr-3 text-slate-600 dark:text-slate-300">
-                          {row.relatedOwned.length > 0
-                            ? row.relatedOwned.join(', ')
-                            : row.baseLabel ?? 'No close skill on this CV'}
-                        </td>
-                        <td className="py-2 pr-3">
-                          <span className={transferDifficultyClass(row.difficulty)}>
-                            {transferDifficultyLabel(row.difficulty)}
-                          </span>
-                        </td>
-                        <td className="py-2">
-                          {row.checkIt ? (
-                            <button
-                              type="button"
-                              disabled={!!loading}
-                              onClick={() => void toggleClaimedSkill(row.skill)}
-                              className="text-xs font-semibold text-track-accent hover:underline disabled:opacity-50"
-                            >
-                              {transferCheck(row.difficulty) === 'yes'
-                                ? 'Yes — check'
-                                : 'Probably — check'}
-                            </button>
-                          ) : (
-                            <span
-                              className={
-                                row.difficulty === 'hard'
-                                  ? 'text-xs font-semibold text-orange-700 dark:text-orange-300'
-                                  : 'text-xs font-semibold text-rose-700 dark:text-rose-300'
-                              }
-                            >
-                              {transferCheck(row.difficulty) === 'unlikely' ? 'Unlikely' : 'No'}
+                      <Fragment key={row.skill}>
+                        <tr>
+                          <td className="py-2 pr-3 font-medium text-brand-ink">
+                            <SkillName
+                              skill={row.skill}
+                              added={addedKeys.has(skillKey(row.skill))}
+                              active={explainSkillName === row.skill}
+                              onClick={() => void lookupSkill(row.skill)}
+                            />
+                          </td>
+                          <td className="py-2 pr-3 text-brand-muted">{baseFor(row)}</td>
+                          <td className="py-2 pr-3">
+                            <span className={transferDifficultyClass(row.difficulty)}>
+                              {transferDifficultyLabel(row.difficulty)}
                             </span>
-                          )}
-                        </td>
-                      </tr>
+                          </td>
+                          <td className="w-[7.5rem] whitespace-nowrap py-2">{claimFor(row)}</td>
+                        </tr>
+                        {explainSkillName === row.skill && (
+                          <tr>
+                            <td colSpan={4} className="pb-3">
+                              <SkillAnswer
+                                loading={explainLoading}
+                                error={explainError}
+                                summary={explanation}
+                              />
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
                     ))}
                   </tbody>
                 </table>
@@ -429,53 +614,60 @@ export function TailorPanel({ job }: TailorPanelProps) {
       )}
 
       {showTailor && tailoredCv && (
-        <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-track-700 dark:bg-track-800">
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <h3 className="font-semibold">Tailored preview</h3>
-            <div className="flex items-center gap-3">
+        <div className={nested}>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm text-brand-muted">Tailored preview</h3>
+            <div className="flex items-center gap-2">
+              {!skillsLocked && (
+                <button
+                  type="button"
+                  disabled={!!loading}
+                  className={quietBtn}
+                  onClick={() => void runTailor()}
+                >
+                  Re-run
+                </button>
+              )}
               <button
                 type="button"
-                disabled={!!loading}
-                className="text-xs font-medium text-track-accent hover:underline disabled:opacity-50"
-                onClick={() => void runTailor()}
-              >
-                Re-run
-              </button>
-              <button
-                type="button"
-                className="text-xs text-slate-500 hover:underline"
-                onClick={() => setPanelOpen('tailor', false)}
+                className={quietBtn}
+                onClick={hidePack}
               >
                 Close
               </button>
             </div>
           </div>
-          <p className="mt-1 text-sm font-medium">{tailoredCv.headline}</p>
-          <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-300">
+          <p className="text-sm font-medium text-brand-ink">{tailoredCv.headline}</p>
+          <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-brand-ink">
             {tailoredCv.summary}
           </p>
           {tailoredCv.experience[0]?.bullets?.length ? (
-            <ul className="mt-3 space-y-1 text-sm text-slate-600 dark:text-slate-300">
+            <ul className="mt-3 space-y-1 text-sm text-brand-ink">
               {tailoredCv.experience[0].bullets.slice(0, 4).map((b) => (
-                <li key={b.id}>• {b.text}</li>
+                <li key={b.id} className="flex gap-2">
+                  <span className="text-brand-muted">•</span>
+                  {b.text}
+                </li>
               ))}
             </ul>
           ) : null}
-          <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-3 dark:border-track-700">
+          <div className="m-actions mt-4 flex flex-wrap gap-2 border-t border-[#e6eeeb] pt-4">
             <button
               type="button"
+              data-role="primary"
               disabled={!!loading}
               onClick={handleApplicationPack}
-              className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-800 disabled:opacity-50"
+              className={`${pasteBtn} m-action`}
               title="ZIP folder with resume and cover letter"
             >
               {loading === 'pack' ? 'Packing…' : 'Download application folder'}
             </button>
             <button
               type="button"
+              data-role="quiet"
               disabled={!!loading}
               onClick={handlePrint}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-track-700 disabled:opacity-50"
+              className={`${quietBtn} m-action`}
             >
               {loading === 'print' ? 'Opening…' : 'Print / PDF'}
             </button>
@@ -483,30 +675,32 @@ export function TailorPanel({ job }: TailorPanelProps) {
         </div>
       )}
 
-      {showCover && coverLetter.trim() && (
-        <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-track-700 dark:bg-track-800">
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <h3 className="font-semibold">Cover letter</h3>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                className="text-xs text-track-accent hover:underline"
-                onClick={() => navigator.clipboard.writeText(coverLetter)}
-              >
-                Copy
-              </button>
-              <button
-                type="button"
-                className="text-xs text-slate-500 hover:underline"
-                onClick={() => setPanelOpen('cover', false)}
-              >
-                Close
-              </button>
-            </div>
+      {showTailor && (
+        <div className={nested}>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm text-brand-muted">Cover letter</h3>
+            {coverLetter.trim() && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className={quietBtn}
+                  onClick={() => navigator.clipboard.writeText(coverLetter)}
+                >
+                  Copy
+                </button>
+                <button type="button" className={quietBtn} onClick={hidePack}>
+                  Close
+                </button>
+              </div>
+            )}
           </div>
-          <p className="whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-300">
-            {coverLetter}
-          </p>
+          {coverLetter.trim() ? (
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-brand-ink">{coverLetter}</p>
+          ) : (
+            <p className="text-sm text-brand-muted">
+              No cover letter saved with this resume. Re-run creates the resume and the letter together.
+            </p>
+          )}
         </div>
       )}
     </div>
