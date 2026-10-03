@@ -1,3 +1,4 @@
+import { TrashIcon } from '../components/TrashIcon'
 import { useEffect, useRef, useState } from 'react'
 import { useJobs } from '../hooks/useJobs'
 import { useSavedSearches } from '../hooks/useSavedSearches'
@@ -363,9 +364,7 @@ function CvDeleteButton({ onClick, label, disabled }: { onClick: () => void; lab
       title={label}
       className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#e6eeeb] bg-white text-brand-muted transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
     >
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="h-4 w-4" aria-hidden="true">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3 6h18M9 6V4h6v2M5 6l1 14h12l1-14M10 10v6M14 10v6" />
-      </svg>
+      <TrashIcon />
     </button>
   )
 }
