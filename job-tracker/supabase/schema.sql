@@ -90,7 +90,6 @@ alter table job_applications add constraint job_applications_interview_stage_che
 alter table job_applications add column if not exists interviews jsonb not null default '[]'::jsonb;
 alter table job_applications add column if not exists not_selected boolean not null default false;
 alter table job_applications add column if not exists needs_rescore boolean not null default false;
-alter table job_inbox add column if not exists matched_track text;
 
 create table if not exists job_inbox (
   id uuid primary key default gen_random_uuid(),
@@ -114,6 +113,7 @@ create table if not exists job_inbox (
   unique (user_id, external_id)
 );
 
+alter table job_inbox add column if not exists matched_track text;
 alter table job_inbox add column if not exists seen_count integer;
 update job_inbox set seen_count = 1 where seen_count is null;
 alter table job_inbox alter column seen_count set default 1;
