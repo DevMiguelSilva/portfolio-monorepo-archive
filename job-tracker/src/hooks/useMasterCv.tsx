@@ -6,6 +6,15 @@ import { createDefaultLibrary, normalizeLibrary, type CvTrack, type MasterCv, ty
 import { useAuth } from './useAuth'
 
 const LOCAL_KEY = 'applytrack-master-cv'
+function nextRevision(previous: string | null): string {
+  const last = previous ? Date.parse(previous) : 0
+  return new Date(Math.max(Date.now(), Number.isFinite(last) ? last + 1 : 0)).toISOString()
+}
+interface PendingCv {
+  track: CvTrack
+  cv: MasterCv
+  attachment?: ResumeAttachment
+}
 function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`
   if (value && typeof value === 'object') return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical((value as Record<string, unknown>)[key])}`).join(',')}}`
@@ -18,7 +27,7 @@ interface MasterCvContextValue {
   loading: boolean
   loadError: string | null
   reload: () => Promise<void>
-  setActiveTrack: (track: CvTrack) => Promise<void>
+  setActiveTrack: (track: CvTrack, pending?: PendingCv) => Promise<void>
   getCv: (track: CvTrack) => MasterCv | undefined
   getLabel: (track: CvTrack) => string
   saveTrackCv: (track: CvTrack, cv: MasterCv) => Promise<void>
@@ -45,6 +54,7 @@ export function MasterCvProvider({ children }: { children: ReactNode }) {
   const queue = useRef<Promise<void>>(Promise.resolve())
   const ready = useRef(false)
   const generation = useRef(0)
+  const cloudRevision = useRef<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const cloud = isCloudEnabled && Boolean(user)
@@ -56,19 +66,24 @@ export function MasterCvProvider({ children }: { children: ReactNode }) {
     setLoadError(null)
     try {
       let next: MasterCvLibrary
+      let revision: string | null = null
       if (cloud && supabase && user) {
-        const { data, error } = await supabase.from('master_cvs').select('document').eq('user_id', user.id).maybeSingle()
+        const { data, error } = await supabase.from('master_cvs').select('document, updated_at').eq('user_id', user.id).maybeSingle()
         if (error) throw error
+        revision = data?.updated_at ?? null
         next = data ? normalizeLibrary(data.document) : readLocal()
         if (!data || canonical(next) !== canonical(data.document)) {
+          next = {...next, updatedAt:nextRevision(revision)}
           if (data) {
             const {data: migrated, error: writeError} = await supabase.from('master_cvs').update({document:next, updated_at:next.updatedAt})
-              .eq('user_id', user.id).eq('document', JSON.stringify(data.document)).select('user_id').maybeSingle()
+              .eq('user_id', user.id).eq('updated_at', data.updated_at).select('updated_at').maybeSingle()
             if (writeError) throw writeError
             if (!migrated) throw new Error('Your CV library changed while loading. Retry to load the latest version.')
+            revision = migrated.updated_at
           } else {
-            const {error: writeError} = await supabase.from('master_cvs').insert({user_id:user.id, document:next, updated_at:next.updatedAt})
+            const {data: inserted, error: writeError} = await supabase.from('master_cvs').insert({user_id:user.id, document:next, updated_at:next.updatedAt}).select('updated_at').single()
             if (writeError) throw writeError
+            revision = inserted.updated_at
           }
         }
       } else {
@@ -76,6 +91,7 @@ export function MasterCvProvider({ children }: { children: ReactNode }) {
         localStorage.setItem(LOCAL_KEY, JSON.stringify(next))
       }
       if (generation.current !== version) return
+      cloudRevision.current = revision
       current.current = next
       setLibrary(next)
       ready.current = true
@@ -100,12 +116,16 @@ export function MasterCvProvider({ children }: { children: ReactNode }) {
     return pending
   }, [])
   const persist = useCallback((change: (value: MasterCvLibrary) => MasterCvLibrary) => runMutation(async (value) => {
-    const next = {...change(value), updatedAt: new Date().toISOString()}
+    const version = generation.current
+    // Keep the revision strictly increasing even for writes within the same millisecond.
+    const updatedAt = nextRevision(cloudRevision.current ?? value.updatedAt)
+    const next = {...change(value), updatedAt}
     if (cloud && supabase && user) {
       const {data, error} = await supabase.from('master_cvs').update({document:next, updated_at:next.updatedAt})
-        .eq('user_id', user.id).eq('document', JSON.stringify(value)).select('user_id').maybeSingle()
+        .eq('user_id', user.id).eq('updated_at', cloudRevision.current!).select('updated_at').maybeSingle()
       if (error) throw error
       if (!data) throw new Error('Your CV library changed in another session. Your draft is preserved; reload before saving.')
+      if (generation.current === version) cloudRevision.current = data.updated_at
     } else {
       const stored = localStorage.getItem(LOCAL_KEY)
       if (stored && canonical(JSON.parse(stored)) !== canonical(value)) throw new Error('Your CV library changed in another tab. Your draft is preserved; reload before saving.')
@@ -114,9 +134,12 @@ export function MasterCvProvider({ children }: { children: ReactNode }) {
     return next
   }), [cloud, user, runMutation])
 
-  const setActiveTrack = useCallback((id: string) => persist((value) => {
+  const setActiveTrack = useCallback((id: string, pending?: PendingCv) => persist((value) => {
     if (!value.cvs[id]) throw new Error('This CV template no longer exists.')
-    return {...value, activeTrack:id}
+    if (pending && !value.cvs[pending.track]) throw new Error('The edited CV template no longer exists. Your draft is preserved.')
+    return {...value, activeTrack:id,
+      cvs:pending ? {...value.cvs, [pending.track]:{...pending.cv, updatedAt:new Date().toISOString()}} : value.cvs,
+      attachments:pending?.attachment ? {...value.attachments, [pending.track]:pending.attachment} : value.attachments}
   }), [persist])
   const saveTemplate = useCallback((id: string, cv: MasterCv, attachment?: ResumeAttachment | null) => persist((value) => {
     if (!value.cvs[id]) throw new Error('This CV template no longer exists.')
@@ -136,10 +159,13 @@ export function MasterCvProvider({ children }: { children: ReactNode }) {
   }), [persist])
   const deleteTemplate = useCallback(async (id: string, replacement?: string) => {
     await runMutation(async (value) => {
+      const version = generation.current
       if (cloud && supabase && user) {
         const {data, error} = await supabase.rpc('delete_cv_template', {p_template_id:id, p_replacement_id:replacement ?? null, p_expected_document:value})
         if (error) throw error
-        return normalizeLibrary(data)
+        const next = normalizeLibrary(data)
+        if (generation.current === version) cloudRevision.current = next.updatedAt
+        return next
       }
       return deleteLocalCv(localStorage, value, id, replacement)
     })

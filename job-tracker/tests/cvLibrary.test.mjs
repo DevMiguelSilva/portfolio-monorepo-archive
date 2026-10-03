@@ -12,7 +12,7 @@ function moduleUrl(path, replacements = {}) {
 const typesUrl = moduleUrl('../src/types/cv.ts')
 const { createDefaultLibrary, createEmptyMasterCv, normalizeLibrary } = await import(typesUrl)
 const { addCvTemplate, removeCvTemplate, deleteLocalCv, resolveJobCv, recoverCvTransaction } = await import(moduleUrl('../src/lib/cvLibrary.ts', { '../types/cv': typesUrl }))
-const { scoreDualTracks } = await import(moduleUrl('../src/lib/matchScore.ts', { '../types/cv': typesUrl }))
+const { scoreDualTracks, createCvMatcher, textHasSkill } = await import(moduleUrl('../src/lib/matchScore.ts', { '../types/cv': typesUrl }))
 
 test('legacy and dynamic libraries retain CV content, IDs, names and attachments', () => {
   const legacy = createDefaultLibrary()
@@ -59,6 +59,21 @@ test('Auto scores every current template and keeps legacy tie preference', () =>
   const match = scoreDualTracks('Python SQL developer', { frontend: blank, custom })
   assert.equal(match.bestTrack, 'custom')
   assert.deepEqual(Object.keys(match.scores), ['frontend', 'custom'])
+})
+
+test('prepared batch matching preserves aliases, boundaries, requirements and live CV changes', () => {
+  const library = createDefaultLibrary()
+  const score = createCvMatcher(library.cvs)
+  const job = 'Developer\nReact.js, TS, RESTful APIs, French and bilingual communication.'
+  assert.deepEqual(score(job), scoreDualTracks(job, library.cvs))
+  assert.ok(score(job).scores.frontend.targets.includes('French'))
+  assert.ok(score(job).scores.frontend.missing.includes('French'))
+  assert.equal(textHasSkill('React.js and TS with RESTful APIs', 'React'), true)
+  assert.equal(textHasSkill('React.js and TS with RESTful APIs', 'TypeScript'), true)
+  assert.equal(textHasSkill('classical typography', 'CSS'), false)
+  const changed = {...library.cvs, frontend:{...library.cvs.frontend, summary:'French bilingual communicator'}}
+  assert.ok(createCvMatcher(changed)(job).scores.frontend.matched.includes('French'))
+  assert.ok(score(job).scores.frontend.missing.includes('French'))
 })
 
 test('local deletion rolls back every record after a write failure and recovers interrupted writes', () => {

@@ -14,10 +14,12 @@ import { parseJobPosting } from '../api/gemini'
 import { inboxJobToRow, rowToInboxJob } from '../lib/database'
 import {
   dualTrackReasonLine,
+  createCvMatcher,
   scoreDualTracks,
   scoreMasterCvAgainstJob,
   withRequirementSignals,
   type MatchResult,
+  type DualTrackMatch,
 } from '../lib/matchScore'
 import { expandSearchLocations } from '../lib/searchLocations'
 import { supabase } from '../lib/supabase'
@@ -82,9 +84,10 @@ function pickMatch(
   jobText: string,
   searchTrack: SearchTrack,
   cvs: Record<CvTrack, MasterCv>,
-  names: Record<string, string>
+  names: Record<string, string>,
+  score: (text: string) => DualTrackMatch = (text) => scoreDualTracks(text, cvs)
 ): MatchResult & { track: CvTrack } {
-  const dual = scoreDualTracks(jobText, cvs)
+  const dual = score(jobText)
   const track = searchTrack === 'auto' ? dual.bestTrack : searchTrack
   const match = dual.scores[track]
   if (!match) throw new Error('The selected CV is unavailable. Choose another CV for this search.')
@@ -113,6 +116,18 @@ export function InboxProvider({ children }: { children: ReactNode }) {
   const isCloudSync = isCloudEnabled && Boolean(user)
 
   const cvsByTrack = library.cvs
+  const matchJob = useMemo(() => {
+    const score = createCvMatcher(cvsByTrack)
+    const cache = new Map<string, DualTrackMatch>()
+    return (text: string) => {
+      const existing = cache.get(text)
+      if (existing) return existing
+      const match = score(text)
+      if (cache.size >= 500) cache.delete(cache.keys().next().value!)
+      cache.set(text, match)
+      return match
+    }
+  }, [cvsByTrack])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -292,7 +307,7 @@ export function InboxProvider({ children }: { children: ReactNode }) {
           }
 
           const jobText = `${result.role}\n${result.description}`
-          const match = pickMatch(jobText, search.track ?? 'auto', cvsByTrack, library.names)
+          const match = pickMatch(jobText, search.track ?? 'auto', cvsByTrack, library.names, matchJob)
           const prevMerged = merged.get(result.externalId)
           const seenCount = nextSeenCount(result.externalId, existing)
 
@@ -380,7 +395,7 @@ export function InboxProvider({ children }: { children: ReactNode }) {
     } finally {
       setRefreshing(false)
     }
-  }, [searches, inbox, jobs, cvsByTrack, library.names, persistAll])
+  }, [searches, inbox, jobs, cvsByTrack, library.names, matchJob, persistAll])
 
   const updateInboxItem = useCallback(
     async (id: string, updates: Partial<InboxJob>) => {
@@ -481,10 +496,10 @@ export function InboxProvider({ children }: { children: ReactNode }) {
     if (item.status !== 'new') return item
     const search = searches.find((entry) => entry.id === item.savedSearchId)
     try {
-      const match = pickMatch(`${item.role}\n${item.description}`, search?.track ?? (item.matchedTrack && library.cvs[item.matchedTrack] ? item.matchedTrack : 'auto'), library.cvs, library.names)
+      const match = pickMatch(`${item.role}\n${item.description}`, search?.track ?? (item.matchedTrack && cvsByTrack[item.matchedTrack] ? item.matchedTrack : 'auto'), cvsByTrack, library.names, matchJob)
       return { ...item, matchedTrack: match.track, matchScore: match.score, matchReasons: match.reasons }
     } catch { return { ...item, matchScore: 0, matchReasons: ['Selected CV unavailable. Update the saved search before approval.'] } }
-  }).sort((a, b) => b.matchScore - a.matchScore), [inbox, searches, library])
+  }).sort((a, b) => b.matchScore - a.matchScore), [inbox, searches, cvsByTrack, library.names, matchJob])
 
   const value = useMemo(
     () => ({

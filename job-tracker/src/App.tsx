@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { ProtectedRoute } from './components/ProtectedRoute'
@@ -13,9 +14,11 @@ import { AddJobPage } from './pages/AddJobPage'
 import { AuthPage } from './pages/AuthPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { InboxPage } from './pages/InboxPage'
-import { JobDetailPage } from './pages/JobDetailPage'
 import { MasterCvPage } from './pages/MasterCvPage'
 import { PortalsPage } from './pages/PortalsPage'
+
+// Document export libraries are needed only on application details, not every route.
+const JobDetailPage = lazy(() => import('./pages/JobDetailPage').then((module) => ({ default: module.JobDetailPage })))
 
 function LoginRoute() {
   const { user, isCloudEnabled } = useAuth()
@@ -41,7 +44,7 @@ function AppRoutes() {
                         <Route path="inbox" element={<InboxPage />} />
                         <Route path="portals" element={<PortalsPage />} />
                         <Route path="add" element={<AddJobPage />} />
-                        <Route path="job/:id" element={<JobDetailPage />} />
+                        <Route path="job/:id" element={<Suspense fallback={<p className="text-sm text-brand-muted">Loading application…</p>}><JobDetailPage /></Suspense>} />
                         <Route path="cv" element={<MasterCvPage />} />
                       </Route>
                     </Route>

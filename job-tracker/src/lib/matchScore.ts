@@ -119,9 +119,15 @@ function aliasesFor(value: string): string[] {
   ).flat()
 }
 
+const variantCache = new Map<string, string[]>()
+const needleCache = new Map<string, RegExp>()
+const CACHE_LIMIT = 512
+
 function variantsFor(skill: string): string[] {
   const n = normalize(skill)
   if (!n) return []
+  const cached = variantCache.get(n)
+  if (cached) return cached
   const set = new Set<string>()
 
   const add = (raw: string) => {
@@ -143,12 +149,20 @@ function variantsFor(skill: string): string[] {
     if (partStripped) add(partStripped)
   }
 
-  return [...set].filter(Boolean)
+  const variants = [...set].filter(Boolean)
+  if (variantCache.size >= CACHE_LIMIT) variantCache.delete(variantCache.keys().next().value!)
+  variantCache.set(n, variants)
+  return variants
 }
 
 function haystackHasNeedle(haystack: string, needle: string): boolean {
   if (needle.length <= 2 || !needle.includes(' ')) {
-    const re = new RegExp(`(?:^|[^a-z0-9+#])${escapeRegExp(needle)}(?:[^a-z0-9+#]|$)`)
+    let re = needleCache.get(needle)
+    if (!re) {
+      re = new RegExp(`(?:^|[^a-z0-9+#])${escapeRegExp(needle)}(?:[^a-z0-9+#]|$)`)
+      if (needleCache.size >= CACHE_LIMIT) needleCache.delete(needleCache.keys().next().value!)
+      needleCache.set(needle, re)
+    }
     return re.test(haystack)
   }
   return haystack.includes(needle)
@@ -156,7 +170,10 @@ function haystackHasNeedle(haystack: string, needle: string): boolean {
 
 /** True if skill (or an alias) appears in haystack. */
 export function textHasSkill(haystack: string, skill: string): boolean {
-  const h = normalize(haystack)
+  return normalizedTextHasSkill(normalize(haystack), skill)
+}
+
+function normalizedTextHasSkill(h: string, skill: string): boolean {
   if (!h) return false
 
   for (const needle of variantsFor(skill)) {
@@ -168,6 +185,7 @@ export function textHasSkill(haystack: string, skill: string): boolean {
 
 function uniqueSkills(skills: string[]): string[] {
   const seen = new Set<string>()
+  const seenVariants = new Set<string>()
   const out: string[] = []
   for (const raw of skills) {
     const s = raw.trim()
@@ -175,9 +193,10 @@ function uniqueSkills(skills: string[]): string[] {
     const key = normalize(s)
     if (!key || seen.has(key)) continue
     // Dedupe alias siblings to one label (prefer first-seen / JD wording)
-    const already = out.some((o) => variantsFor(o).some((v) => variantsFor(s).includes(v)))
-    if (already) continue
+    const variants = variantsFor(s)
+    if (variants.some((variant) => seenVariants.has(variant))) continue
     seen.add(key)
+    for (const variant of variants) seenVariants.add(variant)
     out.push(s)
   }
   return out
@@ -263,7 +282,8 @@ export function deriveJdKeywords(
   if (extracted.length > 0) return extracted
 
   const lexicon = uniqueSkills([...seedSkills, ...COMMON_JD_KEYWORDS])
-  return lexicon.filter((k) => textHasSkill(jobText, k)).slice(0, 40)
+  const normalizedJob = normalize(jobText)
+  return lexicon.filter((k) => normalizedTextHasSkill(normalizedJob, k)).slice(0, 40)
 }
 
 /**
@@ -277,6 +297,10 @@ export function scoreJdCoverage(
   seedSkills: string[] = []
 ): MatchResult {
   const targets = deriveJdKeywords(jobText, extractedSkills, seedSkills)
+  return scoreTargets(cvText, targets)
+}
+
+function scoreTargets(cvText: string, targets: string[]): MatchResult {
 
   if (targets.length === 0) {
     return {
@@ -300,8 +324,9 @@ export function scoreJdCoverage(
 
   const matched: string[] = []
   const missing: string[] = []
+  const normalizedCv = normalize(cvText)
   for (const skill of targets) {
-    if (textHasSkill(cvText, skill)) matched.push(skill)
+    if (normalizedTextHasSkill(normalizedCv, skill)) matched.push(skill)
     else missing.push(skill)
   }
 
@@ -334,15 +359,26 @@ export function scoreDualTracks(
   cvs: Record<CvTrack, MasterCv>,
   extractedSkills: string[] = []
 ): DualTrackMatch {
+  return createCvMatcher(cvs)(jobText, extractedSkills)
+}
+
+/** Prepare CV text and the keyword lexicon once for a batch of inbox jobs. */
+export function createCvMatcher(cvs: Record<CvTrack, MasterCv>) {
   const ids = Object.keys(cvs)
   if (!ids.length) throw new Error('Add at least one CV template before matching jobs.')
   const seed = uniqueSkills(ids.flatMap((id) => masterCvSkillList(cvs[id])))
-  const targets = deriveJdKeywords(jobText, extractedSkills, seed)
-
-  const scores = Object.fromEntries(ids.map((id) => [id, scoreJdCoverage(jobText, masterCvSearchText(cvs[id]), targets, seed)]))
-  let bestTrack = cvs.powerPlatform ? 'powerPlatform' : ids[0]
-  for (const id of ids) if (scores[id].score > scores[bestTrack].score) bestTrack = id
-  return { scores, bestTrack, bestScore: scores[bestTrack].score }
+  const lexicon = uniqueSkills([...seed, ...COMMON_JD_KEYWORDS])
+  const texts = Object.fromEntries(ids.map((id) => [id, masterCvSearchText(cvs[id])]))
+  return (jobText: string, extractedSkills: string[] = []): DualTrackMatch => {
+    const extracted = withRequirementSignals(jobText, extractedSkills)
+    const normalizedJob = normalize(jobText)
+    const targets = extracted.length ? extracted
+      : lexicon.filter((keyword) => normalizedTextHasSkill(normalizedJob, keyword)).slice(0, 40)
+    const scores = Object.fromEntries(ids.map((id) => [id, scoreTargets(texts[id], targets)]))
+    let bestTrack = ids.includes('powerPlatform') ? 'powerPlatform' : ids[0]
+    for (const id of ids) if (scores[id].score > scores[bestTrack].score) bestTrack = id
+    return { scores, bestTrack, bestScore: scores[bestTrack].score }
+  }
 }
 
 export function dualTrackReasonLine(dual: DualTrackMatch, names: Record<string, string> = CV_TRACK_LABELS): string {
