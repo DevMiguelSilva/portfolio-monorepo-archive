@@ -71,6 +71,7 @@ export async function handleGemini(body: unknown, env: ServerEnv): Promise<ApiRe
       description?: string
       resumeText?: string
       track?: string
+      templateName?: string
       job?: Record<string, unknown>
       profile?: Record<string, unknown>
       masterCv?: Record<string, unknown>
@@ -85,7 +86,9 @@ export async function handleGemini(body: unknown, env: ServerEnv): Promise<ApiRe
       const trackHint =
         input.track === 'powerPlatform'
           ? 'This resume is for Microsoft Power Platform roles (Power Apps, Power Automate, Dataverse, Power BI).'
-          : 'This resume is for Front-end / React / TypeScript roles.'
+          : input.track === 'frontend'
+            ? 'This resume is for Front-end / React / TypeScript roles.'
+            : `Template name: ${JSON.stringify((input.templateName ?? '').slice(0, 200))}. Extract only facts from the resume; do not infer a role family from the template name.`
       const prompt = `Extract a structured master CV from this resume text.
 ${trackHint}
 Return ONLY valid JSON (no markdown) with this exact shape:

@@ -1,4 +1,5 @@
-export type CvTrack = 'frontend' | 'powerPlatform'
+/** Stable template identifier; names can change without breaking job history. */
+export type CvTrack = string
 
 export const CV_TRACKS: CvTrack[] = ['powerPlatform', 'frontend']
 
@@ -119,6 +120,8 @@ export interface ResumeAttachment {
 }
 
 export interface MasterCvLibrary {
+  version: 2
+  names: Record<CvTrack, string>
   activeTrack: CvTrack
   cvs: Record<CvTrack, MasterCv>
   attachments: Record<CvTrack, ResumeAttachment | null>
@@ -271,6 +274,8 @@ export function createDefaultMasterCv(): MasterCv {
 export function createDefaultLibrary(): MasterCvLibrary {
   const now = new Date().toISOString()
   return {
+    version: 2,
+    names: { frontend: 'React', powerPlatform: 'Power Platform' },
     activeTrack: 'powerPlatform',
     cvs: {
       frontend: createDefaultFrontendCv(),
@@ -293,18 +298,19 @@ export function normalizeLibrary(raw: unknown): MasterCvLibrary {
 
   // Already a library
   if (obj.cvs && typeof obj.cvs === 'object') {
-    const cvs = obj.cvs as Partial<Record<CvTrack, MasterCv>>
-    const attachments = (obj.attachments ?? {}) as Partial<Record<CvTrack, ResumeAttachment | null>>
+    const rawCvs = obj.cvs as Record<string, MasterCv>
+    const ids = Object.keys(rawCvs).filter((key) => !['auto', '__proto__', 'constructor', 'prototype'].includes(key))
+    if (!ids.length) return base
+    const names = (obj.names ?? {}) as Record<string, string>
+    const attachments = (obj.attachments ?? {}) as Record<string, ResumeAttachment | null>
     return {
-      activeTrack: obj.activeTrack === 'frontend' ? 'frontend' : 'powerPlatform',
-      cvs: {
-        frontend: normalizeMasterCv(cvs.frontend, base.cvs.frontend),
-        powerPlatform: normalizeMasterCv(cvs.powerPlatform, base.cvs.powerPlatform),
-      },
-      attachments: {
-        frontend: attachments.frontend ?? null,
-        powerPlatform: attachments.powerPlatform ?? null,
-      },
+      version: 2,
+      activeTrack: typeof obj.activeTrack === 'string' && ids.includes(obj.activeTrack)
+        ? obj.activeTrack : ids.includes('powerPlatform') ? 'powerPlatform' : ids[0],
+      names: Object.fromEntries(ids.map((key, index) => [key, typeof names[key] === 'string' && names[key].trim()
+        ? names[key].trim() : CV_TRACK_LABELS[key] ?? `CV ${index + 1}`])),
+      cvs: Object.fromEntries(ids.map((key) => [key, normalizeMasterCv(rawCvs[key], base.cvs[key] ?? createEmptyMasterCv())])),
+      attachments: Object.fromEntries(ids.map((key) => [key, attachments[key] ?? null])),
       updatedAt: typeof obj.updatedAt === 'string' ? obj.updatedAt : base.updatedAt,
     }
   }
@@ -313,6 +319,7 @@ export function normalizeLibrary(raw: unknown): MasterCvLibrary {
   if ('contact' in obj || 'headline' in obj || 'skills' in obj) {
     return {
       ...base,
+      activeTrack: 'frontend',
       cvs: {
         frontend: normalizeMasterCv(obj as unknown as MasterCv, base.cvs.frontend),
         powerPlatform: base.cvs.powerPlatform,

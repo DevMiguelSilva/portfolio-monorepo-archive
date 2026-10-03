@@ -4,6 +4,10 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Keep centered page/header edges fixed when a route gains a scrollbar. */
+html { scrollbar-gutter: stable; }
+@supports not (scrollbar-gutter: stable) { html { overflow-y: scroll; } }
+
 @layer components {
   .form-select {
     appearance: none;

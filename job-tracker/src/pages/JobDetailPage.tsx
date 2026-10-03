@@ -15,7 +15,7 @@ export function JobDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { getJob, deleteJob, restoreJob, purgeJob, updateJob, moveJob } = useJobs()
-  const { getCv, activeTrack, library } = useMasterCv()
+  const { getCv, activeTrack, library, getLabel } = useMasterCv()
   const { getForJob } = useTailoredDocs()
   const job = id ? getJob(id) : undefined
   const hasResume = Boolean(id && getForJob(id)?.tailoredCv)
@@ -33,14 +33,15 @@ export function JobDetailPage() {
 
   const matchPercent = useMemo(() => {
     if (!job) return null
-    if (job.matchScore != null) return job.matchScore
-    const track = job.cvTrack ?? activeTrack ?? 'powerPlatform'
+    if (job.status !== 'saved') return getForJob(job.id)?.matchScore ?? job.matchScore
+    const selectedCv = getCv(job.cvTrack ?? activeTrack)
+    if (!selectedCv) return null
     return scoreMasterCvAgainstJob(
       `${job.role}\n${job.jobDescription}`,
-      getCv(track),
+      selectedCv,
       job.extractedSkills
     ).score
-  }, [job, getCv, activeTrack, library])
+  }, [job, getCv, activeTrack, getForJob])
 
   useEffect(() => {
     if (!job || job.status !== 'saved' || job.deletedAt) setEditingJd(false)
@@ -169,7 +170,9 @@ export function JobDetailPage() {
       const track = job.cvTrack ?? activeTrack
       const described = `${role}\n${fullJd}`
       extractedSkills = withRequirementSignals(described, extractedSkills)
-      const match = scoreMasterCvAgainstJob(described, getCv(track), extractedSkills)
+      const selectedCv = getCv(track)
+      if (!selectedCv) throw new Error('Choose an existing CV template for this job.')
+      const match = scoreMasterCvAgainstJob(described, selectedCv, extractedSkills)
 
       await updateJob(job.id, {
         jobDescription: fullJd,
@@ -576,6 +579,7 @@ export function JobDetailPage() {
       </section>
 
       {showInterviewPrep && <InterviewPrepPanel job={job} />}
+      {job.status === 'saved' && !job.deletedAt && <label className="block rounded-2xl border border-[#e6eeeb] bg-white p-5 text-sm text-brand-muted">CV template<select aria-label="CV template" className="mt-2 w-full rounded-lg border border-[#e6eeeb] bg-white px-3 py-2 text-brand-ink" value={job.cvTrack ?? activeTrack} onChange={(e) => { void updateJob(job.id, { cvTrack: e.target.value, matchScore: null, needsRescore: true }).catch((error) => setJdError(error instanceof Error ? error.message : 'Could not change CV template.')) }}>{!library.cvs[job.cvTrack ?? activeTrack] && <option value={job.cvTrack ?? activeTrack}>Unavailable template — choose a CV</option>}{Object.keys(library.cvs).map((id) => <option key={id} value={id}>{getLabel(id)}</option>)}</select></label>}
       {job.jdComplete && <TailorPanel job={job} />}
     </div>
   )

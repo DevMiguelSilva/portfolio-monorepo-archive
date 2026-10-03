@@ -6,8 +6,9 @@ import { IconAction } from '../components/IconAction'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { useInbox } from '../hooks/useInbox'
 import { useSavedSearches } from '../hooks/useSavedSearches'
+import { useMasterCv } from '../hooks/useMasterCv'
 import { expandSearchLocations } from '../lib/searchLocations'
-import { CV_TRACK_LABELS, CV_TRACKS, type CvTrack } from '../types/cv'
+import { type CvTrack } from '../types/cv'
 import { createEmptySavedSearch, type SavedSearch } from '../types/job'
 
 const toolbarBtn =
@@ -30,7 +31,7 @@ const emptyDraft = {
   location: '',
   maxDaysOld: 7,
   excludeTerms: '',
-  track: 'powerPlatform' as CvTrack,
+  track: 'auto' as CvTrack,
 }
 
 try {
@@ -216,7 +217,7 @@ export function InboxPage() {
       location: search.location,
       maxDaysOld: search.maxDaysOld,
       excludeTerms: search.excludeTerms ?? '',
-      track: search.track === 'frontend' ? 'frontend' : 'powerPlatform',
+      track: search.track,
     })
   }
 
@@ -487,8 +488,9 @@ function SavedSearchBody({
   onSave: () => void
   onCancel: () => void
 }) {
+  const { getLabel } = useMasterCv()
   const name = search.label.trim() || search.query
-  const meta = searchMeta(search)
+  const meta = searchMeta(search, getLabel)
 
   if (editing) {
     return (
@@ -598,7 +600,7 @@ function TrashIcon() {
   )
 }
 
-function searchMeta(search: SavedSearch) {
+function searchMeta(search: SavedSearch, getLabel: (id: string) => string) {
   return [
     search.label.trim() && search.label.trim() !== search.query ? search.query : '',
     expandSearchLocations(search.location)
@@ -606,7 +608,7 @@ function searchMeta(search: SavedSearch) {
       .join(' · '),
     `last ${search.maxDaysOld}d`,
     search.country.toUpperCase(),
-    `CV: ${search.track === 'auto' ? 'Auto (best match)' : CV_TRACK_LABELS[search.track]}`,
+    `CV: ${search.track === 'auto' ? 'Auto (best match)' : getLabel(search.track)}`,
     search.excludeTerms?.trim() ? `exclude: ${search.excludeTerms.trim()}` : '',
   ]
     .filter(Boolean)
@@ -620,6 +622,7 @@ function SearchFields({
   draft: typeof emptyDraft
   setDraft: React.Dispatch<React.SetStateAction<typeof emptyDraft>>
 }) {
+  const { library, getLabel } = useMasterCv()
   return (
     <div className="search-fields">
       <label className="block">
@@ -675,9 +678,10 @@ function SearchFields({
           onChange={(e) => setDraft((d) => ({ ...d, track: e.target.value as CvTrack }))}
           className={`${fieldControl} form-select`}
         >
-          {CV_TRACKS.map((track) => (
+          <option value="auto">Auto (best match)</option>
+          {Object.keys(library.cvs).map((track) => (
             <option key={track} value={track}>
-              {CV_TRACK_LABELS[track]}
+              {getLabel(track)}
             </option>
           ))}
         </select>

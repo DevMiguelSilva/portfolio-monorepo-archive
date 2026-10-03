@@ -1,5 +1,5 @@
 import type { CvTrack, MasterCv } from '../types/cv'
-import { CV_TRACK_LABELS, CV_TRACKS, masterCvSearchText, masterCvSkillList } from '../types/cv'
+import { CV_TRACK_LABELS, masterCvSearchText, masterCvSkillList } from '../types/cv'
 
 export interface MatchResult {
   score: number
@@ -11,8 +11,7 @@ export interface MatchResult {
 }
 
 export interface DualTrackMatch {
-  frontend: MatchResult
-  powerPlatform: MatchResult
+  scores: Record<CvTrack, MatchResult>
   bestTrack: CvTrack
   bestScore: number
 }
@@ -329,40 +328,25 @@ export function scoreMasterCvAgainstJob(
   )
 }
 
-/** Score both tracks; bestTrack prefers Power Platform when scores tie. */
+/** Compare every current template, retaining the legacy Power Platform tie preference. */
 export function scoreDualTracks(
   jobText: string,
   cvs: Record<CvTrack, MasterCv>,
   extractedSkills: string[] = []
 ): DualTrackMatch {
-  const seed = uniqueSkills([
-    ...masterCvSkillList(cvs.frontend),
-    ...masterCvSkillList(cvs.powerPlatform),
-  ])
+  const ids = Object.keys(cvs)
+  if (!ids.length) throw new Error('Add at least one CV template before matching jobs.')
+  const seed = uniqueSkills(ids.flatMap((id) => masterCvSkillList(cvs[id])))
   const targets = deriveJdKeywords(jobText, extractedSkills, seed)
 
-  const frontend = scoreJdCoverage(
-    jobText,
-    masterCvSearchText(cvs.frontend),
-    targets,
-    seed
-  )
-  const powerPlatform = scoreJdCoverage(
-    jobText,
-    masterCvSearchText(cvs.powerPlatform),
-    targets,
-    seed
-  )
-
-  const bestTrack: CvTrack =
-    frontend.score > powerPlatform.score ? 'frontend' : 'powerPlatform'
-  const bestScore = Math.max(frontend.score, powerPlatform.score)
-
-  return { frontend, powerPlatform, bestTrack, bestScore }
+  const scores = Object.fromEntries(ids.map((id) => [id, scoreJdCoverage(jobText, masterCvSearchText(cvs[id]), targets, seed)]))
+  let bestTrack = cvs.powerPlatform ? 'powerPlatform' : ids[0]
+  for (const id of ids) if (scores[id].score > scores[bestTrack].score) bestTrack = id
+  return { scores, bestTrack, bestScore: scores[bestTrack].score }
 }
 
-export function dualTrackReasonLine(dual: DualTrackMatch): string {
-  return `Scores: ${CV_TRACK_LABELS.frontend} ${dual.frontend.score}% · ${CV_TRACK_LABELS.powerPlatform} ${dual.powerPlatform.score}%`
+export function dualTrackReasonLine(dual: DualTrackMatch, names: Record<string, string> = CV_TRACK_LABELS): string {
+  return `Scores: ${formatDualTrackScores(dual, names)}`
 }
 
 export function parseDualTrackReason(reasons: string[]): { frontend: number; powerPlatform: number } | null {
@@ -472,6 +456,6 @@ export function buildGapReport(
   }
 }
 
-export function formatDualTrackScores(dual: DualTrackMatch): string {
-  return CV_TRACKS.map((t) => `${CV_TRACK_LABELS[t]} ${dual[t].score}%`).join(' · ')
+export function formatDualTrackScores(dual: DualTrackMatch, names: Record<string, string> = CV_TRACK_LABELS): string {
+  return Object.keys(dual.scores).map((id) => `${names[id] ?? id} ${dual.scores[id].score}%`).join(' · ')
 }

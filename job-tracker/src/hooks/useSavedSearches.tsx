@@ -1,3 +1,4 @@
+import { CV_LIBRARY_EVENT, recoverCvTransaction } from '../lib/cvLibrary'
 import {
   createContext,
   useCallback,
@@ -47,7 +48,7 @@ function normalizeSearch(
     whatPhrase: search.whatPhrase ?? '',
   })
   const track =
-    search.track === 'frontend' || search.track === 'powerPlatform' || search.track === 'auto'
+    typeof search.track === 'string' && search.track.trim()
       ? search.track
       : /power\s*(platform|apps|automate)|dataverse/i.test(query)
         ? 'powerPlatform'
@@ -98,6 +99,7 @@ interface SavedSearchesContextValue {
 const SavedSearchesContext = createContext<SavedSearchesContextValue | null>(null)
 
 function readLocal(): SavedSearch[] {
+  recoverCvTransaction(localStorage)
   try {
     const stored = localStorage.getItem(LOCAL_KEY)
     if (!stored) return []
@@ -206,7 +208,10 @@ export function SavedSearchesProvider({ children }: { children: ReactNode }) {
   }, [isCloudSync, user])
 
   useEffect(() => {
-    load()
+    void load()
+    const refresh = () => { void load() }
+    window.addEventListener(CV_LIBRARY_EVENT, refresh)
+    return () => window.removeEventListener(CV_LIBRARY_EVENT, refresh)
   }, [load])
 
   const addSearch = useCallback(
