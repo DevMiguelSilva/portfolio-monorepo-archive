@@ -16,7 +16,6 @@ Personal workspace for **Miguel Silva** — portfolio site plus independent prod
 Portfolio/
 ├── portfolio/         ← Main portfolio website
 ├── job-tracker/       ← ApplyTrack (standalone product)
-├── expense-tracker/   ← Splitplan (standalone, not on the site yet)
 ├── fit-tracker/       ← FitTrack (standalone product)
 ├── ARCHITECTURE.md    ← Monorepo layout & product boundaries
 ├── DEPLOY.md          ← Step-by-step deploy guide
